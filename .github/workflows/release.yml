@@ -20,7 +20,7 @@ jobs:
       run: sudo apt install lazarus
 
     - name: Install GTK library 
-      run: sudo apt install libgtk2.0-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+      run: sudo apt install libgtk2.0-dev libunwind-15-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
     
     - name: Checkout source
       uses: actions/checkout@v2
