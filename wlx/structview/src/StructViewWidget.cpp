@@ -98,11 +98,10 @@ void StructViewWidget::setupUi()
 
     m_fm = new FocusManager(this, m_gridView, this);
     m_fm->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q), FocusManager::Always, [this]() {
-        QWidget *target = m_fm->pluginRoot()->parentWidget();
-        if (target) {
-            target->setFocus(Qt::OtherFocusReason);
+        m_fm->setActive(false);
+        if (QWidget *top = m_fm->pluginRoot()->window()) {
             QKeyEvent *ke = new QKeyEvent(QEvent::KeyPress, Qt::Key_Q, Qt::ControlModifier);
-            QCoreApplication::postEvent(target, ke);
+            QCoreApplication::postEvent(top, ke);
         }
         return true;
     });
