@@ -360,6 +360,12 @@ bool MpvWidget::eventFilter(QObject *obj, QEvent *event)
             return true; // eat the ESC so DC doesn't process it
         }
 
+        // Ctrl+Q: return control to DC so it closes preview pane
+        if (ke->key() == Qt::Key_Q && (ke->modifiers() & Qt::ControlModifier)) {
+            m_isActive = false;
+            return false; // let DC process it
+        }
+
         // Forward the key to mpv
         if (m_mpv) {
             QString mpvKey = mapQtKeyToMpvKey(ke);
