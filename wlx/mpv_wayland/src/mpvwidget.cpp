@@ -363,7 +363,12 @@ bool MpvWidget::eventFilter(QObject *obj, QEvent *event)
         // Ctrl+Q: return control to DC so it closes preview pane
         if (ke->key() == Qt::Key_Q && (ke->modifiers() & Qt::ControlModifier)) {
             m_isActive = false;
-            return false; // let DC process it
+            restoreFocusToDC();
+            if (QWidget *top = window()) {
+                QKeyEvent *newKe = new QKeyEvent(QEvent::KeyPress, Qt::Key_Q, Qt::ControlModifier);
+                QCoreApplication::postEvent(top, newKe);
+            }
+            return true;
         }
 
         // Forward the key to mpv
