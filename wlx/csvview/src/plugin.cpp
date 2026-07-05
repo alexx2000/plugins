@@ -447,6 +447,15 @@ void CsvViewerWidget::setupFindReplace()
 	});
 
 	// Register shortcuts via FocusManager
+	m_fm->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q), FocusManager::Always, [this]() {
+		QWidget *target = m_fm->pluginRoot()->parentWidget();
+		if (target) {
+			target->setFocus(Qt::OtherFocusReason);
+			QKeyEvent *ke = new QKeyEvent(QEvent::KeyPress, Qt::Key_Q, Qt::ControlModifier);
+			QCoreApplication::postEvent(target, ke);
+		}
+		return true;
+	});
 	m_fm->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_F), FocusManager::WhenNoInput, [this]() {
 		m_actFindReplace->setChecked(!m_findReplace->isPanelVisible());
 		return true;
