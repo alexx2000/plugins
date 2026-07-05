@@ -4,6 +4,7 @@
 #include "DuckDbModel.h"
 #include "MdbEngine.h"
 #include <QKeyEvent>
+#include <QCoreApplication>
 
 #include <wlxbase_wlqt/FocusManager.h>
 #include <wlxbase_wlqt/PluginToolBar.h>
@@ -133,6 +134,15 @@ void DbViewWidget::setupUi(const QString &firstTable)
     m_tableView->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
     m_fm = new FocusManager(this, m_tableView, this);
+    m_fm->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q), FocusManager::Always, [this]() {
+        QWidget *target = m_fm->pluginRoot()->parentWidget();
+        if (target) {
+            target->setFocus(Qt::OtherFocusReason);
+            QKeyEvent *ke = new QKeyEvent(QEvent::KeyPress, Qt::Key_Q, Qt::ControlModifier);
+            QCoreApplication::postEvent(target, ke);
+        }
+        return true;
+    });
 
     setupToolbar();
     mainLayout->addWidget(m_toolbar);
