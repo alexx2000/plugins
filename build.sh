@@ -79,6 +79,7 @@ install -m 644 wlx/jsonview/jsonview_qt6.wlx release/wlx/jsonview/
 cp -r wlx/jsonview/langs release/wlx/jsonview/
 install -m 644 wlx/jsonview/*.md release/wlx/jsonview/
 install -m 644 wlx/jsonview/*.png release/wlx/jsonview/
+
 # logview
 mkdir -p release/wlx/logview
 mkdir -p wlx/logview/build
