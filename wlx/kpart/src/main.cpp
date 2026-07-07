@@ -143,7 +143,8 @@ void DCPCALL ListGetDetectString(char* DetectString, int maxlen)
     QStringList priorityList = {
         "ASC", "CPP", "H++", "C++", "HTM", "INS", "LATEX", "LTX", "PAS", "PATCH",
         "PERL", "PHP3", "PHP4", "PHP5", "PHPS", "STY", "VRML", "XSD", "TGZ", "LZH",
-        "GEM", "001", "PKG", "TB2", "TZO", "JPEG", "JPE", "TIFF"
+        "GEM", "001", "PKG", "TB2", "TZO", "JPEG", "JPE", "TIFF",
+        "F90", "F95", "FOR", "PM", "POD", "T", "MAK", "CLS", "DTX"
     };
     for (const QString &p : priorityList) {
         preferred.insert(p.toUpper());
