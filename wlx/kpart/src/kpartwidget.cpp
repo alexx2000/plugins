@@ -371,7 +371,7 @@ void KPartWidget::instantiatePart()
             installFocusGuard();
             restoreFocusToDC();
             if (m_part && m_part->widget()) {
-                QTimer::singleShot(300, m_part->widget(), [w = m_part->widget()]() {
+                QTimer::singleShot(300, m_part->widget(), [this, w = m_part->widget()]() {
                     QCoreApplication::postEvent(w, new QEvent(QEvent::WindowActivate));
                     QCoreApplication::postEvent(w, new QResizeEvent(w->size(), w->size()));
                     QCoreApplication::postEvent(w, new QEnterEvent(QPointF(0,0), QPointF(0,0), QPointF(0,0)));
@@ -383,6 +383,25 @@ void KPartWidget::instantiatePart()
                         QCoreApplication::postEvent(child, new QResizeEvent(child->size(), child->size()));
                         child->update();
                     }
+                    
+                    if (m_selectedPart.pluginId() == QLatin1String("markdownpart")) {
+                        QScrollBar *vbar = nullptr;
+                        QAbstractScrollArea *scrollArea = w->findChild<QAbstractScrollArea*>();
+                        if (scrollArea) {
+                            vbar = scrollArea->verticalScrollBar();
+                        }
+                        if (!vbar) {
+                            for (QScrollBar *bar : w->findChildren<QScrollBar*>()) {
+                                if (bar->orientation() == Qt::Vertical && bar->maximum() > 0) {
+                                    vbar = bar;
+                                    break;
+                                }
+                            }
+                        }
+                        if (vbar) {
+                            vbar->setValue(0);
+                        }
+                    }
                 });
             }
         });
@@ -390,7 +409,7 @@ void KPartWidget::instantiatePart()
             installFocusGuard();
             restoreFocusToDC();
             if (m_part && m_part->widget()) {
-                QTimer::singleShot(300, m_part->widget(), [w = m_part->widget()]() {
+                QTimer::singleShot(300, m_part->widget(), [this, w = m_part->widget()]() {
                     QCoreApplication::postEvent(w, new QEvent(QEvent::WindowActivate));
                     QCoreApplication::postEvent(w, new QResizeEvent(w->size(), w->size()));
                     QCoreApplication::postEvent(w, new QEnterEvent(QPointF(0,0), QPointF(0,0), QPointF(0,0)));
@@ -401,6 +420,25 @@ void KPartWidget::instantiatePart()
                         QCoreApplication::postEvent(child, new QEvent(QEvent::WindowActivate));
                         QCoreApplication::postEvent(child, new QResizeEvent(child->size(), child->size()));
                         child->update();
+                    }
+                    
+                    if (m_selectedPart.pluginId() == QLatin1String("markdownpart")) {
+                        QScrollBar *vbar = nullptr;
+                        QAbstractScrollArea *scrollArea = w->findChild<QAbstractScrollArea*>();
+                        if (scrollArea) {
+                            vbar = scrollArea->verticalScrollBar();
+                        }
+                        if (!vbar) {
+                            for (QScrollBar *bar : w->findChildren<QScrollBar*>()) {
+                                if (bar->orientation() == Qt::Vertical && bar->maximum() > 0) {
+                                    vbar = bar;
+                                    break;
+                                }
+                            }
+                        }
+                        if (vbar) {
+                            vbar->setValue(0);
+                        }
                     }
                 });
             }
