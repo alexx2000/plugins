@@ -370,7 +370,6 @@ bool MpvWidget::eventFilter(QObject *obj, QEvent *event)
             }
             return true;
         }
-
         // Forward the key to mpv
         if (m_mpv) {
             QString mpvKey = mapQtKeyToMpvKey(ke);
