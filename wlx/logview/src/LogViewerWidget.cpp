@@ -758,7 +758,6 @@ bool LogViewerWidget::eventFilter(QObject *obj, QEvent *event) {
             }
             return true;
         }
-
         // Enter in search edit: trigger search, return focus to list
         if (m_activeInput == searchEdit && (ke->key() == Qt::Key_Return ||
                                              ke->key() == Qt::Key_Enter)) {
