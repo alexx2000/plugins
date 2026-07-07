@@ -114,12 +114,17 @@ void DCPCALL ListGetDetectString(char* DetectString, int maxlen)
         for (const QString &mimeName : mimeTypes) {
             QMimeType mimeType = mimeDb.mimeTypeForName(mimeName);
             if (mimeType.isValid()) {
-                QString fullExt = mimeType.preferredSuffix();
-                int lastDot = fullExt.lastIndexOf(QLatin1Char('.'));
-                QString ext = (lastDot == -1) ? fullExt : fullExt.mid(lastDot + 1);
-                ext = ext.toUpper();
-                if (!ext.isEmpty()) {
-                    extensions.insert(ext);
+                QStringList globs = mimeType.globPatterns();
+                for (const QString &glob : globs) {
+                    if (glob.startsWith(QLatin1String("*."))) {
+                        QString fullExt = glob.mid(2);
+                        int lastDot = fullExt.lastIndexOf(QLatin1Char('.'));
+                        QString ext = (lastDot == -1) ? fullExt : fullExt.mid(lastDot + 1);
+                        ext = ext.toUpper();
+                        if (!ext.isEmpty()) {
+                            extensions.insert(ext);
+                        }
+                    }
                 }
             }
         }
