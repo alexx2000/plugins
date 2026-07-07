@@ -106,16 +106,25 @@ void DCPCALL ListGetDetectString(char* DetectString, int maxlen)
     QSet<QString> extensions;
     QMimeDatabase mimeDb;
     
-    // Find all KParts installed on the system
+    // Find all KParts installed on the system, plus Okular generators
     QVector<KPluginMetaData> parts = KPluginMetaData::findPlugins(QStringLiteral("kf6/parts"));
+    parts.append(KPluginMetaData::findPlugins(QStringLiteral("okular_generators")));
     for (const KPluginMetaData &part : parts) {
         QStringList mimeTypes = part.mimeTypes();
         for (const QString &mimeName : mimeTypes) {
             QMimeType mimeType = mimeDb.mimeTypeForName(mimeName);
             if (mimeType.isValid()) {
-                QString ext = mimeType.preferredSuffix().toUpper();
-                if (!ext.isEmpty()) {
-                    extensions.insert(ext);
+                QStringList globs = mimeType.globPatterns();
+                for (const QString &glob : globs) {
+                    if (glob.startsWith(QLatin1String("*."))) {
+                        QString fullExt = glob.mid(2);
+                        int lastDot = fullExt.lastIndexOf(QLatin1Char('.'));
+                        QString ext = (lastDot == -1) ? fullExt : fullExt.mid(lastDot + 1);
+                        ext = ext.toUpper();
+                        if (!ext.isEmpty()) {
+                            extensions.insert(ext);
+                        }
+                    }
                 }
             }
         }
