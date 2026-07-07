@@ -103,7 +103,8 @@ void DCPCALL ListGetDetectString(char* DetectString, int maxlen)
         appCreated = true;
     }
 
-    QSet<QString> extensions;
+    QSet<QString> preferred;
+    QSet<QString> allExts;
     QMimeDatabase mimeDb;
     
     // Find all KParts installed on the system, plus Okular generators
@@ -119,18 +120,40 @@ void DCPCALL ListGetDetectString(char* DetectString, int maxlen)
                 QString ext = (lastDot == -1) ? fullExt : fullExt.mid(lastDot + 1);
                 ext = ext.toUpper();
                 if (!ext.isEmpty()) {
-                    extensions.insert(ext);
+                    preferred.insert(ext);
+                }
+                
+                QStringList globs = mimeType.globPatterns();
+                for (const QString &glob : globs) {
+                    if (glob.startsWith(QLatin1String("*."))) {
+                        QString fExt = glob.mid(2);
+                        int lDot = fExt.lastIndexOf(QLatin1Char('.'));
+                        QString aExt = (lDot == -1) ? fExt : fExt.mid(lDot + 1);
+                        aExt = aExt.toUpper();
+                        if (!aExt.isEmpty()) {
+                            allExts.insert(aExt);
+                        }
+                    }
                 }
             }
         }
     }
+    
+    // Priority user-defined extensions that might otherwise be cut off or missed
+    QStringList priorityList = {
+        "ASC", "CPP", "H++", "C++", "HTM", "INS", "LATEX", "LTX", "PAS", "PATCH",
+        "PERL", "PHP3", "PHP4", "PHP5", "PHPS", "STY", "VRML", "XSD", "TGZ", "LZH",
+        "GEM", "001", "PKG", "TB2", "TZO", "JPEG", "JPE", "TIFF"
+    };
+    for (const QString &p : priorityList) {
+        preferred.insert(p.toUpper());
+    }
 
-    if (extensions.isEmpty()) {
+    if (preferred.isEmpty()) {
         // Fallback in case finding plugins failed or zero parts are installed
         snprintf(DetectString, maxlen, "EXT=\"TXT\"");
     } else {
-        QStringList extList = extensions.values();
-        // Sort for deterministic output
+        QStringList extList = preferred.values();
         extList.sort();
         
         QString result;
@@ -139,6 +162,24 @@ void DCPCALL ListGetDetectString(char* DetectString, int maxlen)
                 result += QLatin1String(" | ");
             }
             result += QStringLiteral("EXT=\"%1\"").arg(ext);
+        }
+        
+        QSet<QString> remaining = allExts;
+        remaining.subtract(preferred);
+        
+        QStringList remList = remaining.values();
+        std::sort(remList.begin(), remList.end(), [](const QString &a, const QString &b) {
+            if (a.length() != b.length()) return a.length() < b.length();
+            return a < b;
+        });
+        
+        for (const QString &ext : remList) {
+            QString addition = QStringLiteral(" | EXT=\"%1\"").arg(ext);
+            if (result.length() + addition.length() < maxlen - 1) {
+                result += addition;
+            } else {
+                break;
+            }
         }
         
         QByteArray utf8 = result.toUtf8();
