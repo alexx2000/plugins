@@ -17,6 +17,7 @@ public:
     ~KPartWidget();
 
     bool loadFile(const QString &fileName);
+    void setActive(bool active);
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -24,7 +25,9 @@ protected:
 private:
     void installFocusGuard();
     void returnFocusToDC();
+    void restoreFocusToDC();
     void instantiatePart();
+    bool scrollView(int key);
 
     KParts::ReadOnlyPart *m_part;
     QVBoxLayout *m_layout;
@@ -32,6 +35,8 @@ private:
     QUrl m_pendingUrl;
     KPluginMetaData m_selectedPart;
     QPointer<QWidget> m_savedFocusWidget;
+    QPointer<QWidget> m_partFocusWidget;
+    bool m_isActive = false;
 };
 
 #endif // KPARTWIDGET_H
