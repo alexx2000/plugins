@@ -113,14 +113,9 @@ void DCPCALL ListGetDetectString(char* DetectString, int maxlen)
         for (const QString &mimeName : mimeTypes) {
             QMimeType mimeType = mimeDb.mimeTypeForName(mimeName);
             if (mimeType.isValid()) {
-                QStringList globs = mimeType.globPatterns();
-                for (const QString &glob : globs) {
-                    if (glob.startsWith(QLatin1String("*."))) {
-                        QString ext = glob.mid(2).toUpper();
-                        if (!ext.isEmpty()) {
-                            extensions.insert(ext);
-                        }
-                    }
+                QString ext = mimeType.preferredSuffix().toUpper();
+                if (!ext.isEmpty()) {
+                    extensions.insert(ext);
                 }
             }
         }
