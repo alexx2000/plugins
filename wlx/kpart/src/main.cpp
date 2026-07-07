@@ -3,6 +3,11 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QWidget>
+#include <KPluginMetaData>
+#include <QMimeDatabase>
+#include <QMimeType>
+#include <QSet>
+#include <QStringList>
 #include <cstdio>
 
 extern "C" {
@@ -88,43 +93,62 @@ void DCPCALL ListCloseWindow(HWND ListWin)
 
 void DCPCALL ListGetDetectString(char* DetectString, int maxlen)
 {
-    snprintf(DetectString, maxlen,
-        // Okular: documents & ebooks
-        "EXT=\"PDF\" | EXT=\"EPUB\" | EXT=\"MOBI\" | EXT=\"DJVU\" | EXT=\"DJV\" | "
-        "EXT=\"XPS\" | EXT=\"OXPS\" | EXT=\"PS\" | EXT=\"EPS\" | "
-        "EXT=\"CBR\" | EXT=\"CBZ\" | EXT=\"CB7\" | EXT=\"CBT\" | "
-        "EXT=\"ODT\" | EXT=\"ODS\" | EXT=\"ODP\" | EXT=\"ODG\" | "
-        "EXT=\"DOCX\" | EXT=\"XLSX\" | EXT=\"PPTX\" | EXT=\"DOC\" | EXT=\"PPT\" | "
-        "EXT=\"TIFF\" | EXT=\"TIF\" | EXT=\"CHM\" | "
-        // Gwenview: images
-        "EXT=\"PNG\" | EXT=\"JPG\" | EXT=\"JPEG\" | EXT=\"GIF\" | EXT=\"BMP\" | "
-        "EXT=\"WEBP\" | EXT=\"SVG\" | EXT=\"SVGZ\" | EXT=\"ICO\" | "
-        "EXT=\"XPM\" | EXT=\"PBM\" | EXT=\"PGM\" | EXT=\"PPM\" | EXT=\"PNM\" | "
-        "EXT=\"AVIF\" | EXT=\"JXL\" | EXT=\"HEIF\" | EXT=\"HEIC\" | "
-        // KFontView: fonts
-        "EXT=\"TTF\" | EXT=\"OTF\" | EXT=\"TTC\" | EXT=\"WOFF\" | EXT=\"WOFF2\" | "
-        "EXT=\"PFA\" | EXT=\"PFB\" | EXT=\"PCF\" | EXT=\"BDF\" | "
-        // Ark: archives
-        "EXT=\"ZIP\" | EXT=\"TAR\" | EXT=\"GZ\" | EXT=\"BZ2\" | EXT=\"XZ\" | "
-        "EXT=\"ZSTD\" | EXT=\"ZST\" | EXT=\"LZ\" | EXT=\"LZMA\" | "
-        "EXT=\"7Z\" | EXT=\"RAR\" | EXT=\"ARJ\" | EXT=\"CAB\" | "
-        "EXT=\"RPM\" | EXT=\"DEB\" | EXT=\"ISO\" | EXT=\"CPIO\" | "
-        "EXT=\"TGZ\" | EXT=\"TBZ2\" | EXT=\"TXZ\" | EXT=\"TAR.GZ\" | "
-        // Kate: source code & text
-        "EXT=\"TXT\" | EXT=\"MD\" | EXT=\"RST\" | EXT=\"LOG\" | EXT=\"CONF\" | "
-        "EXT=\"CFG\" | EXT=\"INI\" | EXT=\"YAML\" | EXT=\"YML\" | EXT=\"TOML\" | "
-        "EXT=\"JSON\" | EXT=\"XML\" | EXT=\"CSV\" | EXT=\"TSV\" | "
-        "EXT=\"C\" | EXT=\"H\" | EXT=\"CPP\" | EXT=\"HPP\" | EXT=\"CXX\" | "
-        "EXT=\"CC\" | EXT=\"HH\" | EXT=\"CS\" | "
-        "EXT=\"JAVA\" | EXT=\"KT\" | EXT=\"SCALA\" | EXT=\"GROOVY\" | "
-        "EXT=\"PY\" | EXT=\"RB\" | EXT=\"PL\" | EXT=\"PM\" | EXT=\"LUA\" | "
-        "EXT=\"JS\" | EXT=\"TS\" | EXT=\"JSX\" | EXT=\"TSX\" | EXT=\"VUE\" | "
-        "EXT=\"HTML\" | EXT=\"HTM\" | EXT=\"CSS\" | EXT=\"SCSS\" | EXT=\"SASS\" | EXT=\"LESS\" | "
-        "EXT=\"PHP\" | EXT=\"GO\" | EXT=\"RS\" | EXT=\"SWIFT\" | EXT=\"D\" | "
-        "EXT=\"SH\" | EXT=\"BASH\" | EXT=\"ZSH\" | EXT=\"FISH\" | "
-        "EXT=\"SQL\" | EXT=\"R\" | EXT=\"M\" | EXT=\"TEX\" | EXT=\"BIB\" | "
-        "EXT=\"DIFF\" | EXT=\"PATCH\" | EXT=\"CMAKE\" | EXT=\"MAKEFILE\" | "
-        "EXT=\"PAS\" | EXT=\"PP\" | EXT=\"LPR\" | EXT=\"LPI\" | EXT=\"LPS\"");
+    // Need a QCoreApplication to use QMimeDatabase and KPluginMetaData
+    int argc = 1;
+    char* argv[] = { (char*)"doublecmd", nullptr };
+    QCoreApplication *app = QCoreApplication::instance();
+    bool appCreated = false;
+    if (!app) {
+        app = new QCoreApplication(argc, argv);
+        appCreated = true;
+    }
+
+    QSet<QString> extensions;
+    QMimeDatabase mimeDb;
+    
+    // Find all KParts installed on the system
+    QVector<KPluginMetaData> parts = KPluginMetaData::findPlugins(QStringLiteral("kf6/parts"));
+    for (const KPluginMetaData &part : parts) {
+        QStringList mimeTypes = part.mimeTypes();
+        for (const QString &mimeName : mimeTypes) {
+            QMimeType mimeType = mimeDb.mimeTypeForName(mimeName);
+            if (mimeType.isValid()) {
+                QStringList globs = mimeType.globPatterns();
+                for (const QString &glob : globs) {
+                    if (glob.startsWith(QLatin1String("*."))) {
+                        QString ext = glob.mid(2).toUpper();
+                        if (!ext.isEmpty()) {
+                            extensions.insert(ext);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (extensions.isEmpty()) {
+        // Fallback in case finding plugins failed or zero parts are installed
+        snprintf(DetectString, maxlen, "EXT=\"TXT\"");
+    } else {
+        QStringList extList = extensions.values();
+        // Sort for deterministic output
+        extList.sort();
+        
+        QString result;
+        for (const QString &ext : extList) {
+            if (!result.isEmpty()) {
+                result += QLatin1String(" | ");
+            }
+            result += QStringLiteral("EXT=\"%1\"").arg(ext);
+        }
+        
+        QByteArray utf8 = result.toUtf8();
+        qstrncpy(DetectString, utf8.constData(), maxlen);
+    }
+
+    if (appCreated) {
+        delete app;
+    }
 }
 
 int DCPCALL ListSearchDialog(HWND ListWin, int FindNext)
