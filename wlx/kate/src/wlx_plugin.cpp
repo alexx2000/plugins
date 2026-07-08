@@ -8,6 +8,12 @@
 #include <QDir>
 #include <QHash>
 #include <QObject>
+#include <QCoreApplication>
+#include <KPluginMetaData>
+#include <QMimeDatabase>
+#include <QMimeType>
+#include <QSet>
+#include <QStringList>
 
 static void logLoad(const QString &msg) {
     const QString dir = QStringLiteral(RICH_EDITOR_QT_LOG_DIR);
@@ -117,9 +123,68 @@ void DCPCALL ListCloseWindow(HWND ListWin) {
 }
 
 void DCPCALL ListGetDetectString(char* DetectString, int maxlen) {
-    const char* detectStr = "EXT=\"TXT\" | EXT=\"PAS\" | EXT=\"C\" | EXT=\"CPP\" | EXT=\"H\" | EXT=\"PY\" | EXT=\"JS\" | EXT=\"HTML\" | EXT=\"CSS\" | EXT=\"JSON\" | EXT=\"XML\" | EXT=\"MD\" | EXT=\"SH\"";
-    strncpy(DetectString, detectStr, maxlen - 1);
-    DetectString[maxlen - 1] = '\0';
+    int argc = 0;
+    char **argv = nullptr;
+    bool appCreated = false;
+    if (!QCoreApplication::instance()) {
+        new QCoreApplication(argc, argv);
+        appCreated = true;
+    }
+
+    QSet<QString> allExts;
+    QMimeDatabase mimeDb;
+    
+    QVector<KPluginMetaData> parts = KPluginMetaData::findPlugins(QStringLiteral("kf6/parts"));
+    for (const KPluginMetaData &part : parts) {
+        if (part.pluginId() == QLatin1String("katepart")) {
+            QStringList mimeTypes = part.mimeTypes();
+            for (const QString &mimeName : mimeTypes) {
+                QMimeType mimeType = mimeDb.mimeTypeForName(mimeName);
+                if (mimeType.isValid()) {
+                    QStringList globs = mimeType.globPatterns();
+                    for (const QString &glob : globs) {
+                        if (glob.startsWith(QLatin1String("*."))) {
+                            QString fExt = glob.mid(2);
+                            int lDot = fExt.lastIndexOf(QLatin1Char('.'));
+                            QString aExt = (lDot == -1) ? fExt : fExt.mid(lDot + 1);
+                            aExt = aExt.toUpper();
+                            if (!aExt.isEmpty()) {
+                                allExts.insert(aExt);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    if (allExts.isEmpty()) {
+        const char* detectStr = "EXT=\"TXT\" | EXT=\"PAS\" | EXT=\"C\" | EXT=\"CPP\" | EXT=\"H\" | EXT=\"PY\" | EXT=\"JS\" | EXT=\"HTML\" | EXT=\"CSS\" | EXT=\"JSON\" | EXT=\"XML\" | EXT=\"MD\" | EXT=\"SH\"";
+        strncpy(DetectString, detectStr, maxlen - 1);
+        DetectString[maxlen - 1] = '\0';
+    } else {
+        QStringList extList = allExts.values();
+        extList.sort();
+        
+        QString result;
+        for (const QString &ext : extList) {
+            QString addition = QStringLiteral("EXT=\"%1\"").arg(ext);
+            if (!result.isEmpty()) addition = QLatin1String(" | ") + addition;
+            
+            if (result.length() + addition.length() < maxlen - 1) {
+                result += addition;
+            } else {
+                break;
+            }
+        }
+        
+        QByteArray utf8 = result.toUtf8();
+        qstrncpy(DetectString, utf8.constData(), maxlen);
+    }
+
+    if (appCreated) {
+        delete QCoreApplication::instance();
+    }
 }
 
 int DCPCALL ListSendCommand(HWND ListWin, int Command, int Parameter) {
