@@ -2,6 +2,7 @@
 #include <QMimeDatabase>
 #include <KParts/ReadOnlyPart>
 #include <KParts/PartLoader>
+#include <KParts/OpenUrlArguments>
 #include <KPluginMetaData>
 #include <QUrl>
 #include <QEvent>
@@ -16,6 +17,13 @@
 #include <QEnterEvent>
 #include <QScrollBar>
 #include <QAbstractScrollArea>
+#include <QMessageBox>
+#include <QDialog>
+#include <QAction>
+#include <QSettings>
+#include <QDebug>
+#include <KActionCollection>
+#include <KXMLGUIFactory>
 
 KPartWidget::KPartWidget(QWidget *parent)
     : QWidget(parent)
@@ -204,6 +212,63 @@ bool KPartWidget::eventFilter(QObject *watched, QEvent *event)
                 });
                 return true;
             }
+
+            // Manual Shortcut Routing for Zoom Actions
+            if (m_part) {
+                QString actionToTrigger;
+                if (ke->key() == Qt::Key_F && ke->modifiers() == Qt::NoModifier) {
+                    actionToTrigger = QStringLiteral("view_zoom_to_fit");
+                } else if (ke->key() == Qt::Key_0 && (ke->modifiers() & Qt::ControlModifier)) {
+                    actionToTrigger = QStringLiteral("view_actual_size");
+                } else if (ke->key() == Qt::Key_Plus || ke->key() == Qt::Key_Equal) {
+                    actionToTrigger = QStringLiteral("view_zoom_in");
+                } else if (ke->key() == Qt::Key_Minus) {
+                    actionToTrigger = QStringLiteral("view_zoom_out");
+                } else if (ke->key() == Qt::Key_S && (ke->modifiers() & Qt::ControlModifier) && (ke->modifiers() & Qt::ShiftModifier)) {
+                    actionToTrigger = QStringLiteral("file_save_as");
+                }
+
+                if (!actionToTrigger.isEmpty()) {
+                    // Try actionCollection first
+                    QAction *act = m_part->actionCollection()
+                                       ? m_part->actionCollection()->action(actionToTrigger)
+                                       : nullptr;
+                    // Fallback: findChild by objectName
+                    if (!act) {
+                        act = m_part->findChild<QAction*>(actionToTrigger, Qt::FindChildrenRecursively);
+                    }
+                    qDebug() << "[KPartWidget] KeyPress: key=" << ke->key()
+                             << "looking for action:" << actionToTrigger
+                             << "found:" << (act != nullptr)
+                             << "enabled:" << (act ? act->isEnabled() : false)
+                             << "m_isActive:" << m_isActive;
+                    if (act && act->isEnabled()) {
+                        act->trigger();
+                        return true;
+                    } else if (!act) {
+                        // Dump all available actions for diagnosis
+                        qDebug() << "[KPartWidget] Action not found. Available actions from actionCollection:";
+                        if (m_part->actionCollection()) {
+                            const auto allActions = m_part->actionCollection()->actions();
+                            for (const QAction *a : allActions) {
+                                qDebug() << "  -" << a->objectName() << "text:" << a->text()
+                                         << "checkable:" << a->isCheckable()
+                                         << "checked:" << a->isChecked()
+                                         << "enabled:" << a->isEnabled();
+                            }
+                        }
+                        qDebug() << "[KPartWidget] Available actions from findChildren:";
+                        const auto childActions = m_part->findChildren<QAction*>(Qt::FindChildrenRecursively);
+                        for (const QAction *a : childActions) {
+                            qDebug() << "  -" << a->objectName() << "text:" << a->text()
+                                     << "checkable:" << a->isCheckable()
+                                     << "checked:" << a->isChecked()
+                                     << "enabled:" << a->isEnabled();
+                        }
+                    }
+                }
+            }
+
             // Navigation keys: if the event has propagated up to KPartWidget,
             // it means the KPart didn't handle it (e.g. KTextEditor in
             // read-only embedded mode). Scroll the view ourselves.
@@ -263,6 +328,22 @@ bool KPartWidget::eventFilter(QObject *watched, QEvent *event)
         break;
     }
 
+    case QEvent::Show: {
+        if (watched->isWidgetType() && watched->inherits("QMessageBox")) {
+            QMessageBox *mb = qobject_cast<QMessageBox*>(watched);
+            if (mb) {
+                // If a KPart pops up a warning about a file being deleted or modified,
+                // reject it automatically to prevent freezing Double Commander.
+                QString text = mb->text();
+                if (text.contains(QLatin1String("deleted"), Qt::CaseInsensitive) || 
+                    text.contains(QLatin1String("modified"), Qt::CaseInsensitive)) {
+                    QTimer::singleShot(0, mb, &QDialog::reject);
+                }
+            }
+        }
+        break;
+    }
+
     default:
         break;
     }
@@ -272,6 +353,20 @@ bool KPartWidget::eventFilter(QObject *watched, QEvent *event)
 
 bool KPartWidget::loadFile(const QString &fileName)
 {
+    QUrl url = QUrl::fromLocalFile(fileName);
+
+    if (m_part && m_pendingUrl == url) {
+        // Double Commander is asking us to reload the same file (e.g., it was modified).
+        // Many KParts (like Gwenview) auto-reload the file internally.
+        // Destroying the KPart here while it's processing its own file watcher events
+        // causes severe GLib/GTK crashes. We just safely re-open the URL.
+        KParts::OpenUrlArguments args;
+        args.setReload(true);
+        m_part->setArguments(args);
+        m_part->openUrl(url);
+        return true;
+    }
+
     // Save which widget currently has focus (DC's file list) so we can
     // restore it after the KPart inevitably steals focus.
     m_savedFocusWidget = QApplication::focusWidget();
@@ -287,8 +382,13 @@ bool KPartWidget::loadFile(const QString &fileName)
         m_partFocusWidget = nullptr;
 
         m_part->closeUrl();
-        m_layout->removeWidget(m_part->widget());
-        delete m_part;
+        QWidget *oldWidget = m_part->widget();
+        if (oldWidget) {
+            m_layout->removeWidget(oldWidget);
+            oldWidget->hide();
+            oldWidget->setParent(nullptr);
+        }
+        m_part->deleteLater();
         m_part = nullptr;
     }
 
@@ -303,8 +403,6 @@ bool KPartWidget::loadFile(const QString &fileName)
             mime = extMime;
         }
     }
-
-    QUrl url = QUrl::fromLocalFile(fileName);
 
     // Find all parts available for this MIME type
     QVector<KPluginMetaData> parts = KParts::PartLoader::partsForMimeType(mime.name());
@@ -367,9 +465,174 @@ void KPartWidget::instantiatePart()
         m_layout->addWidget(m_part->widget());
 
         installFocusGuard();
-        connect(m_part, &KParts::ReadOnlyPart::completed, this, [this]() {
+        
+        // Lambda to configure actions: connect toggled signals, set shortcut contexts, etc.
+        // Must be called AFTER the part is fully loaded (from completed signal).
+        auto configureAndRestore = [this]() {
+            if (!m_part || !m_part->widget()) return;
+            
+            // Collect actions from both sources, deduplicating
+            QSet<QAction*> seen;
+            QList<QAction*> allActions;
+            
+            if (m_part->actionCollection()) {
+                const auto acActions = m_part->actionCollection()->actions();
+                qDebug() << "[KPartWidget] configureAndRestore: actionCollection has" << acActions.size() << "actions";
+                for (QAction *a : acActions) {
+                    if (!seen.contains(a)) {
+                        seen.insert(a);
+                        allActions.append(a);
+                    }
+                }
+            }
+            
+            const auto childActions = m_part->findChildren<QAction*>(Qt::FindChildrenRecursively);
+            qDebug() << "[KPartWidget] configureAndRestore: findChildren found" << childActions.size() << "actions";
+            for (QAction *a : childActions) {
+                if (!seen.contains(a)) {
+                    seen.insert(a);
+                    allActions.append(a);
+                }
+            }
+            
+            qDebug() << "[KPartWidget] configureAndRestore: total unique actions:" << allActions.size();
+            
+            for (QAction *act : allActions) {
+                QString actionName = act->objectName();
+                
+                qDebug() << "[KPartWidget] Action:" << actionName
+                         << "text:" << act->text()
+                         << "checkable:" << act->isCheckable()
+                         << "checked:" << act->isChecked()
+                         << "enabled:" << act->isEnabled()
+                         << "shortcutContext:" << act->shortcutContext()
+                         << "shortcuts:" << act->shortcuts();
+                
+                // Add action to widget so shortcuts with WidgetWithChildrenShortcut can work
+                if (!m_part->widget()->actions().contains(act)) {
+                    m_part->widget()->addAction(act);
+                }
+                
+                if (act->shortcutContext() == Qt::WindowShortcut || act->shortcutContext() == Qt::ApplicationShortcut) {
+                    act->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+                }
+                
+                // Guard against duplicate connections using a dynamic property.
+                // Qt::UniqueConnection does NOT work with lambdas.
+                if (act->isCheckable() && !actionName.isEmpty()
+                    && !act->property("_kpw_connected").toBool()) {
+                    act->setProperty("_kpw_connected", true);
+                    
+                    connect(act, &QAction::toggled, this, [this, actionName](bool checked) {
+                        qDebug() << "[KPartWidget] Action toggled:" << actionName << "checked:" << checked;
+                        QSettings s(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("doublecmd"), QStringLiteral("wlx_kpart"));
+                        s.setValue(actionName, checked);
+                        s.sync();
+                        qDebug() << "[KPartWidget] Saved" << actionName << "=" << checked << "to" << s.fileName();
+                        
+                        if (m_part) {
+                            // Radio-button behavior for zoom modes:
+                            // checking one unchecks the other; unchecking one checks the other.
+                            QString otherName;
+                            if (actionName == QLatin1String("view_zoom_to_fit")) {
+                                otherName = QStringLiteral("view_actual_size");
+                            } else if (actionName == QLatin1String("view_actual_size")) {
+                                otherName = QStringLiteral("view_zoom_to_fit");
+                            }
+                            if (!otherName.isEmpty()) {
+                                QAction *other = m_part->actionCollection()
+                                                     ? m_part->actionCollection()->action(otherName)
+                                                     : nullptr;
+                                if (!other) {
+                                    other = m_part->findChild<QAction*>(otherName, Qt::FindChildrenRecursively);
+                                }
+                                if (checked && other && other->isChecked()) {
+                                    qDebug() << "[KPartWidget] Radio: toggling off" << otherName;
+                                    other->trigger(); // let Gwenview handle its internal state
+                                }
+                            }
+                        }
+                        
+                        if (m_part && m_part->widget()) {
+                            QResizeEvent re(m_part->widget()->size(), m_part->widget()->size());
+                            QCoreApplication::sendEvent(m_part->widget(), &re);
+                            m_part->widget()->update();
+                        }
+                    });
+                }
+            }
+            
+            // Now restore saved settings (connections are already established above).
+            // We must use trigger() instead of setChecked() so the KPart's internal
+            // handler fires (e.g. Gwenview actually changes zoom mode, not just checkbox).
+            //
+            // For the zoom radio pair: Gwenview fights back when we setChecked(false)
+            // on zoom_to_fit — it re-checks it internally, cascading through our radio
+            // handler and undoing the restore. Fix: block signals on BOTH zoom actions,
+            // uncheck both, unblock, then trigger() only the desired one.
+            QSettings settings(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("doublecmd"), QStringLiteral("wlx_kpart"));
+            qDebug() << "[KPartWidget] Restoring settings from" << settings.fileName() << "keys:" << settings.allKeys();
+            
+            // Identify zoom actions and which should be active
+            static const QString zoomFit = QStringLiteral("view_zoom_to_fit");
+            static const QString zoomActual = QStringLiteral("view_actual_size");
+            QAction *zoomFitAct = nullptr, *zoomActualAct = nullptr;
+            for (QAction *act : allActions) {
+                if (act->objectName() == zoomFit) zoomFitAct = act;
+                else if (act->objectName() == zoomActual) zoomActualAct = act;
+            }
+            
+            QString activeZoom;
+            if (settings.contains(zoomActual) && settings.value(zoomActual).toBool()) {
+                activeZoom = zoomActual;
+            } else if (settings.contains(zoomFit) && settings.value(zoomFit).toBool()) {
+                activeZoom = zoomFit;
+            }
+            
+            // Restore zoom radio pair: just trigger() the desired action.
+            // trigger() properly changes Gwenview's internal state (same as a menu click).
+            // If the action is already checked (Gwenview's default), skip — it's already active.
+            if (!activeZoom.isEmpty() && (zoomFitAct || zoomActualAct)) {
+                QAction *activeAct = (activeZoom == zoomFit) ? zoomFitAct : zoomActualAct;
+                qDebug() << "[KPartWidget] Restoring zoom:" << activeZoom
+                         << "currently checked:" << (activeAct ? activeAct->isChecked() : false);
+                if (activeAct && !activeAct->isChecked()) {
+                    activeAct->trigger();
+                }
+            }
+            
+            // Restore non-zoom checkable actions normally
+            for (QAction *act : allActions) {
+                if (!act->isCheckable()) continue;
+                QString actionName = act->objectName();
+                // Skip zoom pair (already handled above)
+                if (actionName == zoomFit || actionName == zoomActual) continue;
+                if (!actionName.isEmpty() && settings.contains(actionName)) {
+                    bool desired = settings.value(actionName).toBool();
+                    qDebug() << "[KPartWidget] Restoring" << actionName
+                             << "current:" << act->isChecked() << "desired:" << desired;
+                    if (desired && !act->isChecked()) {
+                        act->trigger();
+                    } else if (!desired && act->isChecked()) {
+                        act->setChecked(false);
+                    }
+                }
+            }
+        };
+        
+        connect(m_part, &KParts::ReadOnlyPart::completed, this, [this, configureAndRestore]() {
             installFocusGuard();
             restoreFocusToDC();
+            
+            // Configure action connections now that the part is fully loaded.
+            // The restore portion inside configureAndRestore uses trigger() which
+            // must run AFTER all of Gwenview's own completed handlers have finished
+            // (otherwise Gwenview resets zoom to its defaults after our restore).
+            // QTimer::singleShot(0) defers to the next event loop iteration.
+            QTimer::singleShot(0, this, [this, configureAndRestore]() {
+                configureAndRestore();
+            });
+            
             if (m_part && m_part->widget()) {
                 QTimer::singleShot(300, m_part->widget(), [this, w = m_part->widget()]() {
                     QCoreApplication::postEvent(w, new QEvent(QEvent::WindowActivate));
@@ -405,9 +668,12 @@ void KPartWidget::instantiatePart()
                 });
             }
         });
-        connect(m_part, &KParts::ReadOnlyPart::completedWithPendingAction, this, [this]() {
+        connect(m_part, &KParts::ReadOnlyPart::completedWithPendingAction, this, [this, configureAndRestore]() {
             installFocusGuard();
             restoreFocusToDC();
+            QTimer::singleShot(0, this, [this, configureAndRestore]() {
+                configureAndRestore();
+            });
             if (m_part && m_part->widget()) {
                 QTimer::singleShot(300, m_part->widget(), [this, w = m_part->widget()]() {
                     QCoreApplication::postEvent(w, new QEvent(QEvent::WindowActivate));
@@ -443,13 +709,17 @@ void KPartWidget::instantiatePart()
                 });
             }
         });
-
+        KParts::OpenUrlArguments args;
+        args.setReload(true);
+        m_part->setArguments(args);
         m_part->openUrl(m_pendingUrl);
 
         // Immediately restore focus after opening (catches synchronous focus steals)
         restoreFocusToDC();
     }
 }
+
+
 
 bool KPartWidget::scrollView(int key)
 {
