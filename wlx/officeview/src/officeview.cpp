@@ -226,7 +226,18 @@ public:
         
         proc.start(x2tBin, QStringList() << configXml.fileName());
         if (proc.waitForFinished(10000)) {
-            return (proc.exitCode() == 0 && QFileInfo::exists(outputPath) && QFileInfo(outputPath).size() > 0);
+            if (proc.exitCode() != 0) {
+                printf("[OfficeView] x2t conversion failed with exit code %d\n", proc.exitCode());
+                fflush(stdout);
+            } else if (!QFileInfo::exists(outputPath) || QFileInfo(outputPath).size() == 0) {
+                printf("[OfficeView] x2t conversion failed: output PDF is empty or missing\n");
+                fflush(stdout);
+            } else {
+                return true;
+            }
+        } else {
+            printf("[OfficeView] x2t conversion timed out or crashed\n");
+            fflush(stdout);
         }
         return false;
     }
@@ -263,6 +274,25 @@ extern "C" {
         QString filePath = QString::fromUtf8(FileToLoad);
         QString ext = QFileInfo(filePath).suffix().toLower();
         
+        // Populate missing config options with defaults automatically
+        QString enginePrefOOXML = getConfigValue("EngineForOOXML", "");
+        if (enginePrefOOXML.isEmpty()) {
+            X2TWrapper checkEngines("EuroOffice");
+            if (checkEngines.isLoaded) {
+                enginePrefOOXML = checkEngines.loadedEngine;
+                setConfigValue(checkEngines.loadedEngine + "Path", checkEngines.libPath);
+            } else {
+                enginePrefOOXML = "LibreOffice";
+            }
+            setConfigValue("EngineForOOXML", enginePrefOOXML);
+        }
+        
+        QString enginePrefODF = getConfigValue("EngineForODF", "");
+        if (enginePrefODF.isEmpty()) {
+            enginePrefODF = "LibreOffice";
+            setConfigValue("EngineForODF", enginePrefODF);
+        }
+        
         // Copy to temp file to prevent doublecmd .lock file focus stealing loop
         QTemporaryFile* tempSource = new QTemporaryFile();
         tempSource->setFileTemplate(QDir::tempPath() + "/officeview_src_XXXXXX." + ext);
@@ -277,13 +307,9 @@ extern "C" {
             srcFile.close();
         }
         tempSource->close(); // Close so external engines can read it
-        // Note: QTemporaryFile auto-removes on destruction. We pass ownership to the widgets.
         
         bool isOOXML = (ext == "docx" || ext == "xlsx" || ext == "pptx");
         bool isODF = (ext == "odt" || ext == "ods" || ext == "odp");
-        
-        QString enginePrefOOXML = getConfigValue("EngineForOOXML", "Auto");
-        QString enginePrefODF = getConfigValue("EngineForODF", "Auto");
         
         QString selectedEngine = "LibreOffice";
         
@@ -299,6 +325,9 @@ extern "C" {
         if (selectedEngine == "EuroOffice" || selectedEngine == "OnlyOffice" || selectedEngine == "Auto") {
             X2TWrapper wrapper(selectedEngine);
             if (wrapper.isLoaded) {
+                printf("[OfficeView] Attempting to render %s with %s (x2t)...\n", filePath.toUtf8().constData(), wrapper.loadedEngine.toUtf8().constData());
+                fflush(stdout);
+                
                 QTemporaryFile* tempPdf = new QTemporaryFile();
                 tempPdf->setFileTemplate(QDir::tempPath() + "/officeview_XXXXXX.pdf");
                 if (tempPdf->open()) {
@@ -308,6 +337,8 @@ extern "C" {
                     if (wrapper.convertToPdf(tempSource->fileName(), outPath)) {
                         QPdfDocument* pdfDoc = new QPdfDocument();
                         if (pdfDoc->load(outPath) == QPdfDocument::Error::None) {
+                            printf("[OfficeView] Successfully rendered %s with %s (x2t)\n", filePath.toUtf8().constData(), wrapper.loadedEngine.toUtf8().constData());
+                            fflush(stdout);
                             PdfViewerWidget* pdfWidget = new PdfViewerWidget(pdfDoc, tempSource, tempPdf, (QWidget*)ParentWin);
                             pdfWidget->show();
                             return (HWND)pdfWidget;
@@ -318,6 +349,8 @@ extern "C" {
                 delete tempPdf;
                 
                 // Fallback to LO if x2t conversion failed
+                printf("[OfficeView] Falling back to LibreOfficeKit for %s\n", filePath.toUtf8().constData());
+                fflush(stdout);
                 selectedEngine = "LibreOffice";
             } else if (enginePrefOOXML == "Auto" || enginePrefODF == "Auto") {
                 selectedEngine = "LibreOffice";
@@ -326,6 +359,9 @@ extern "C" {
         
         // LibreOffice engine
         if (selectedEngine == "LibreOffice") {
+            printf("[OfficeView] Rendering %s with LibreOfficeKit\n", filePath.toUtf8().constData());
+            fflush(stdout);
+            
             if (!pOffice) {
                 QString loPath = findLibreOfficePath();
                 if (!loPath.isEmpty()) {
