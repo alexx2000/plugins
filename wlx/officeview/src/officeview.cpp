@@ -202,9 +202,12 @@ public:
     }
 
     QString getFontsPath() {
+        QString engineLower = loadedEngine.toLower();
+        if (engineLower == "eurooffice") engineLower = "euro-office";
+        
         QString home = QDir::homePath();
         QStringList candidates = {
-            home + "/.local/share/" + loadedEngine.toLower() + "/desktopeditors/data/fonts/AllFonts.js",
+            home + "/.local/share/" + engineLower + "/desktopeditors/data/fonts/AllFonts.js",
             home + "/.local/share/onlyoffice/desktopeditors/data/fonts/AllFonts.js",
             home + "/.local/share/euro-office/desktopeditors/data/fonts/AllFonts.js"
         };
@@ -235,6 +238,8 @@ public:
                               
         configXml.write(xml.toUtf8());
         configXml.flush();
+        // ensure it's written before QProcess runs, while keeping the temp file alive
+        configXml.close(); 
         
         QProcess proc;
         proc.setWorkingDirectory(libPath + "/converter");
@@ -289,7 +294,6 @@ private:
 
 // --- Plugin Entry Points ---
 
-__attribute__((destructor))
 static void officeview_unload() {
     if (pOffice) {
         pOffice->pClass->destroy(pOffice);
@@ -393,7 +397,11 @@ extern "C" {
             if (!pOffice) {
                 QString loPath = findLibreOfficePath();
                 if (!loPath.isEmpty()) {
-                    pOffice = lok_init_2(loPath.toUtf8().constData(), "file:///tmp/lok_profile_officeview");
+                    QString profileUri = "file://" + QDir::tempPath() + "/lok_profile_officeview";
+                    pOffice = lok_init_2(loPath.toUtf8().constData(), profileUri.toUtf8().constData());
+                    if (pOffice) {
+                        atexit(officeview_unload);
+                    }
                 }
             }
             
