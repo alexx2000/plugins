@@ -324,6 +324,12 @@ extern "C" {
             enginePrefODF = "LibreOffice";
             setConfigValue("EngineForODF", enginePrefODF);
         }
+
+        QString enginePrefLegacyMS = getConfigValue("EngineForLegacyMS", "");
+        if (enginePrefLegacyMS.isEmpty()) {
+            enginePrefLegacyMS = enginePrefOOXML; // Default to whatever OOXML defaults to (EuroOffice if available)
+            setConfigValue("EngineForLegacyMS", enginePrefLegacyMS);
+        }
         
         // Copy to temp file to prevent doublecmd .lock file focus stealing loop
         QTemporaryFile* tempSource = new QTemporaryFile();
@@ -342,16 +348,12 @@ extern "C" {
         
         bool isOOXML = (ext == "docx" || ext == "xlsx" || ext == "pptx");
         bool isODF = (ext == "odt" || ext == "ods" || ext == "odp");
+        bool isLegacyMS = (ext == "doc" || ext == "xls" || ext == "ppt");
         
         QString selectedEngine = "LibreOffice";
-        
-        if (isOOXML) {
-            if (enginePrefOOXML == "Auto") selectedEngine = "EuroOffice";
-            else selectedEngine = enginePrefOOXML;
-        } else if (isODF) {
-            if (enginePrefODF == "Auto") selectedEngine = "LibreOffice";
-            else selectedEngine = enginePrefODF;
-        }
+        if (isOOXML) selectedEngine = enginePrefOOXML;
+        else if (isODF) selectedEngine = enginePrefODF;
+        else if (isLegacyMS) selectedEngine = enginePrefLegacyMS;
         
         // Attempt x2t engines
         if (selectedEngine == "EuroOffice" || selectedEngine == "OnlyOffice" || selectedEngine == "Auto") {
