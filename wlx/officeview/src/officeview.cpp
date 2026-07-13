@@ -201,6 +201,19 @@ public:
         }
     }
 
+    QString getFontsPath() {
+        QString home = QDir::homePath();
+        QStringList candidates = {
+            home + "/.local/share/" + loadedEngine.toLower() + "/desktopeditors/data/fonts/AllFonts.js",
+            home + "/.local/share/onlyoffice/desktopeditors/data/fonts/AllFonts.js",
+            home + "/.local/share/euro-office/desktopeditors/data/fonts/AllFonts.js"
+        };
+        for (const QString& c : candidates) {
+            if (QFileInfo::exists(c)) return c;
+        }
+        return "";
+    }
+
     bool convertToPdf(const QString& inputPath, const QString& outputPath) {
         if (!isLoaded) return false;
         
@@ -208,18 +221,24 @@ public:
         configXml.setFileTemplate(QDir::tempPath() + "/x2t_config_XXXXXX.xml");
         if (!configXml.open()) return false;
         
+        QString fontPath = getFontsPath();
+        QString fontTag = fontPath.isEmpty() ? "" : QString("  <m_sAllFontsPath>%1</m_sAllFontsPath>\n").arg(fontPath);
+        
         QString xml = QString("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                               "<TaskQueueDataConvert xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n"
                               "  <m_sFileFrom>%1</m_sFileFrom>\n"
                               "  <m_sFileTo>%2</m_sFileTo>\n"
                               "  <m_nFormatTo>513</m_nFormatTo>\n"
                               "  <m_bIsNoBase64>true</m_bIsNoBase64>\n"
-                              "</TaskQueueDataConvert>").arg(inputPath, outputPath);
+                              "%3"
+                              "</TaskQueueDataConvert>").arg(inputPath, outputPath, fontTag);
                               
         configXml.write(xml.toUtf8());
         configXml.flush();
         
         QProcess proc;
+        proc.setWorkingDirectory(libPath + "/converter");
+        
         QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
         env.insert("LD_LIBRARY_PATH", libPath);
         proc.setProcessEnvironment(env);
