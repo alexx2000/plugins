@@ -15,6 +15,7 @@
 #include <QVBoxLayout>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <vector>
 
 #include "wlxplugin.h"
 
@@ -45,6 +46,102 @@ void setConfigValue(const QString& key, const QString& value) {
 static LibreOfficeKit* pOffice = nullptr;
 static const int TWIPS_PER_PIXEL = 15;
 
+struct PartInfo {
+    int index;
+    long width_twips;
+    long height_twips;
+    int pixel_y_offset;
+    int pixel_width;
+    int pixel_height;
+};
+
+class LOKWidget : public QWidget {
+public:
+    LOKWidget(LibreOfficeKitDocument* doc, QTemporaryFile* sourceFile, QWidget* parent = nullptr) : QWidget(parent), pDoc(doc), m_sourceFile(sourceFile) {
+        if (pDoc) {
+            int docType = pDoc->pClass->getDocumentType(pDoc);
+            if (docType == LOK_DOCTYPE_PRESENTATION) {
+                pDoc->pClass->initializeForRendering(pDoc, "{}");
+            }
+            
+            int numParts = pDoc->pClass->getParts(pDoc);
+            if (numParts <= 0) numParts = 1;
+            
+            for (int i = 0; i < numParts; ++i) {
+                pDoc->pClass->setPart(pDoc, i);
+                long w = 0, h = 0;
+                pDoc->pClass->getDocumentSize(pDoc, &w, &h);
+                
+                PartInfo info;
+                info.index = i;
+                info.width_twips = w;
+                info.height_twips = h;
+                info.pixel_width = w / TWIPS_PER_PIXEL;
+                info.pixel_height = h / TWIPS_PER_PIXEL;
+                info.pixel_y_offset = m_totalHeight;
+                
+                m_totalHeight += info.pixel_height + 20; // 20px gap
+                if (info.pixel_width > m_maxWidth) m_maxWidth = info.pixel_width;
+                
+                m_parts.push_back(info);
+            }
+            setFixedSize(m_maxWidth, m_totalHeight);
+            
+            // Reset to 0 just in case
+            pDoc->pClass->setPart(pDoc, 0);
+        }
+    }
+    
+    ~LOKWidget() {
+        if (pDoc) pDoc->pClass->destroy(pDoc);
+        if (m_sourceFile) delete m_sourceFile;
+    }
+
+protected:
+    void paintEvent(QPaintEvent* event) override {
+        if (!pDoc) return;
+        
+        QRect rect = event->rect();
+        QPainter painter(this);
+        painter.fillRect(rect, Qt::lightGray);
+        
+        for (const auto& part : m_parts) {
+            QRect partRect(0, part.pixel_y_offset, part.pixel_width, part.pixel_height);
+            if (rect.intersects(partRect)) {
+                QRect intersect = rect.intersected(partRect);
+                
+                painter.fillRect(intersect, Qt::white);
+                
+                int localX = intersect.x();
+                int localY = intersect.y() - part.pixel_y_offset;
+                
+                int tilePosX = localX * TWIPS_PER_PIXEL;
+                int tilePosY = localY * TWIPS_PER_PIXEL;
+                int tileWidth = intersect.width() * TWIPS_PER_PIXEL;
+                int tileHeight = intersect.height() * TWIPS_PER_PIXEL;
+                
+                QByteArray buffer;
+                int stride = intersect.width() * 4;
+                buffer.resize(intersect.height() * stride);
+                buffer.fill((char)255);
+                
+                pDoc->pClass->setPart(pDoc, part.index);
+                pDoc->pClass->paintTile(pDoc, (unsigned char*)buffer.data(), intersect.width(), intersect.height(), tilePosX, tilePosY, tileWidth, tileHeight);
+                
+                QImage image((const uchar*)buffer.constData(), intersect.width(), intersect.height(), stride, QImage::Format_ARGB32);
+                painter.drawImage(intersect.topLeft(), image);
+            }
+        }
+    }
+
+private:
+    LibreOfficeKitDocument* pDoc;
+    QTemporaryFile* m_sourceFile;
+    std::vector<PartInfo> m_parts;
+    int m_totalHeight = 0;
+    int m_maxWidth = 0;
+};
+
 QString findLibreOfficePath() {
     QByteArray envPath = qgetenv("LO_PATH");
     if (!envPath.isEmpty()) {
@@ -72,55 +169,6 @@ QString findLibreOfficePath() {
     }
     return QString();
 }
-
-class LOKWidget : public QWidget {
-public:
-    LOKWidget(LibreOfficeKitDocument* doc, QTemporaryFile* sourceFile, QWidget* parent = nullptr) : QWidget(parent), pDoc(doc), m_sourceFile(sourceFile) {
-        long width_twips = 0, height_twips = 0;
-        if (pDoc) {
-            if (pDoc->pClass->getDocumentType(pDoc) == LOK_DOCTYPE_PRESENTATION) {
-                pDoc->pClass->initializeForRendering(pDoc, "");
-                pDoc->pClass->setPart(pDoc, 0);
-            }
-            pDoc->pClass->getDocumentSize(pDoc, &width_twips, &height_twips);
-            setFixedSize(width_twips / TWIPS_PER_PIXEL, height_twips / TWIPS_PER_PIXEL);
-        }
-    }
-    
-    ~LOKWidget() {
-        if (pDoc) pDoc->pClass->destroy(pDoc);
-        if (m_sourceFile) delete m_sourceFile;
-    }
-
-protected:
-    void paintEvent(QPaintEvent* event) override {
-        if (!pDoc) return;
-        
-        QPainter painter(this);
-        painter.fillRect(event->rect(), Qt::white);
-        
-        QRect rect = event->rect();
-        int canvasWidth = rect.width();
-        int canvasHeight = rect.height();
-        int tilePosX = rect.x() * TWIPS_PER_PIXEL;
-        int tilePosY = rect.y() * TWIPS_PER_PIXEL;
-        int tileWidth = canvasWidth * TWIPS_PER_PIXEL;
-        int tileHeight = canvasHeight * TWIPS_PER_PIXEL;
-        int stride = canvasWidth * 4;
-        
-        QByteArray buffer;
-        buffer.resize(canvasHeight * stride);
-        buffer.fill((char)255);
-        
-        pDoc->pClass->paintTile(pDoc, (unsigned char*)buffer.data(), canvasWidth, canvasHeight, tilePosX, tilePosY, tileWidth, tileHeight);
-        QImage image((const uchar*)buffer.constData(), canvasWidth, canvasHeight, stride, QImage::Format_ARGB32);
-        painter.drawImage(rect.topLeft(), image);
-    }
-
-private:
-    LibreOfficeKitDocument* pDoc;
-    QTemporaryFile* m_sourceFile;
-};
 
 // --- X2T Backend (Euro-Office / OnlyOffice) ---
 
@@ -178,7 +226,7 @@ public:
         
         proc.start(x2tBin, QStringList() << configXml.fileName());
         if (proc.waitForFinished(10000)) {
-            return (proc.exitCode() == 0 || QFileInfo::exists(outputPath));
+            return (proc.exitCode() == 0 && QFileInfo::exists(outputPath) && QFileInfo(outputPath).size() > 0);
         }
         return false;
     }
@@ -186,36 +234,26 @@ public:
 
 class PdfViewerWidget : public QWidget {
 public:
-    PdfViewerWidget(QTemporaryFile* sourceFile, const QString& engine, QWidget* parent = nullptr) : QWidget(parent), m_sourceFile(sourceFile) {
+    PdfViewerWidget(QPdfDocument* pdfDoc, QTemporaryFile* sourceFile, QTemporaryFile* tempPdf, QWidget* parent = nullptr) 
+      : QWidget(parent), m_sourceFile(sourceFile), m_tempPdf(tempPdf) {
         QVBoxLayout* layout = new QVBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
         
-        tempPdf = new QTemporaryFile(this);
-        tempPdf->setFileTemplate(QDir::tempPath() + "/officeview_XXXXXX.pdf");
-        if (tempPdf->open()) {
-            QString outPath = tempPdf->fileName();
-            tempPdf->close(); // Close so x2t can write to it
-            
-            X2TWrapper wrapper(engine);
-            if (wrapper.convertToPdf(sourceFile->fileName(), outPath)) {
-                QPdfDocument* pdfDoc = new QPdfDocument(this);
-                pdfDoc->load(outPath);
-                
-                QPdfView* pdfView = new QPdfView(this);
-                pdfView->setDocument(pdfDoc);
-                pdfView->setPageMode(QPdfView::PageMode::MultiPage);
-                layout->addWidget(pdfView);
-            }
-        }
+        pdfDoc->setParent(this);
+        QPdfView* pdfView = new QPdfView(this);
+        pdfView->setDocument(pdfDoc);
+        pdfView->setPageMode(QPdfView::PageMode::MultiPage);
+        layout->addWidget(pdfView);
     }
     
     ~PdfViewerWidget() {
         if (m_sourceFile) delete m_sourceFile;
+        if (m_tempPdf) delete m_tempPdf;
     }
     
 private:
-    QTemporaryFile* tempPdf;
     QTemporaryFile* m_sourceFile;
+    QTemporaryFile* m_tempPdf;
 };
 
 // --- Plugin Entry Points ---
@@ -261,11 +299,27 @@ extern "C" {
         if (selectedEngine == "EuroOffice" || selectedEngine == "OnlyOffice" || selectedEngine == "Auto") {
             X2TWrapper wrapper(selectedEngine);
             if (wrapper.isLoaded) {
-                PdfViewerWidget* pdfWidget = new PdfViewerWidget(tempSource, wrapper.loadedEngine, (QWidget*)ParentWin);
-                pdfWidget->show();
-                return (HWND)pdfWidget;
-            }
-            if (enginePrefOOXML == "Auto" || enginePrefODF == "Auto") {
+                QTemporaryFile* tempPdf = new QTemporaryFile();
+                tempPdf->setFileTemplate(QDir::tempPath() + "/officeview_XXXXXX.pdf");
+                if (tempPdf->open()) {
+                    QString outPath = tempPdf->fileName();
+                    tempPdf->close();
+                    
+                    if (wrapper.convertToPdf(tempSource->fileName(), outPath)) {
+                        QPdfDocument* pdfDoc = new QPdfDocument();
+                        if (pdfDoc->load(outPath) == QPdfDocument::Error::None) {
+                            PdfViewerWidget* pdfWidget = new PdfViewerWidget(pdfDoc, tempSource, tempPdf, (QWidget*)ParentWin);
+                            pdfWidget->show();
+                            return (HWND)pdfWidget;
+                        }
+                        delete pdfDoc;
+                    }
+                }
+                delete tempPdf;
+                
+                // Fallback to LO if x2t conversion failed
+                selectedEngine = "LibreOffice";
+            } else if (enginePrefOOXML == "Auto" || enginePrefODF == "Auto") {
                 selectedEngine = "LibreOffice";
             }
         }
@@ -275,7 +329,7 @@ extern "C" {
             if (!pOffice) {
                 QString loPath = findLibreOfficePath();
                 if (!loPath.isEmpty()) {
-                    pOffice = lok_init(loPath.toUtf8().constData());
+                    pOffice = lok_init_2(loPath.toUtf8().constData(), "file:///tmp/lok_profile_officeview");
                 }
             }
             

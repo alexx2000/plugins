@@ -481,6 +481,7 @@ CMakeFiles/officeview.dir/src/officeview.cpp.o
  /home/pplupo/repos/plugins/sdk/common.h
  /home/pplupo/repos/plugins/sdk/wlxplugin.h
  /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKit.h
+ /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKitEnums.h
  /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKitInit.h
  /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKitTypes.h
  /usr/include/alloca.h

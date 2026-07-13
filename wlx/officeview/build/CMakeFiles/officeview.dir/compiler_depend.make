@@ -478,6 +478,7 @@ CMakeFiles/officeview.dir/src/officeview.cpp.o: /home/pplupo/repos/plugins/wlx/o
   /home/pplupo/repos/plugins/sdk/common.h \
   /home/pplupo/repos/plugins/sdk/wlxplugin.h \
   /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKit.h \
+  /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKitEnums.h \
   /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKitInit.h \
   /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKitTypes.h \
   /usr/include/alloca.h \
@@ -1113,8 +1114,6 @@ officeview.wlx: /usr/lib/crti.o \
 /usr/include/wchar.h:
 
 /usr/include/sys/types.h:
-
-/usr/include/sys/select.h:
 
 /usr/include/sys/cdefs.h:
 
@@ -2368,6 +2367,10 @@ CMakeFiles/4.3.4/CMakeSystem.cmake:
 
 /usr/lib/cmake/Qt6Gui/Qt6QEglFSKmsGbmIntegrationPluginTargets-relwithdebinfo.cmake:
 
+/usr/include/bits/types/__fpos64_t.h:
+
+/usr/lib/cmake/Qt6Gui/Qt6GuiConfigVersion.cmake:
+
 /usr/include/c++/16/bits/stdexcept_except.h:
 
 /usr/lib/cmake/Qt6/QtPublicPluginHelpers.cmake:
@@ -2809,6 +2812,10 @@ CMakeFiles/4.3.4/CMakeSystem.cmake:
 /usr/lib/cmake/Qt6Gui/Qt6QWaylandWlShellIntegrationPluginTargets-relwithdebinfo.cmake:
 
 /usr/lib/cmake/Qt6Network/Qt6QTlsBackendCertOnlyPluginTargets.cmake:
+
+/usr/include/sys/select.h:
+
+/home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKitEnums.h:
 
 /usr/lib/cmake/Qt6Gui/Qt6QWaylandWlShellIntegrationPluginTargets.cmake:
 
@@ -3261,7 +3268,3 @@ CMakeFiles/4.3.4/CMakeCXXCompiler.cmake:
 /usr/include/bits/timex.h:
 
 /usr/include/bits/types/FILE.h:
-
-/usr/lib/cmake/Qt6Gui/Qt6GuiConfigVersion.cmake:
-
-/usr/include/bits/types/__fpos64_t.h:

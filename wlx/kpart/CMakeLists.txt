@@ -15,6 +15,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 find_package(KF6Parts REQUIRED)
 find_package(KF6KIO REQUIRED)
 find_package(KF6CoreAddons REQUIRED)
+find_package(KF6XmlGui REQUIRED)
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/../../sdk
@@ -33,6 +34,7 @@ target_link_libraries(kpart_host_qt6
     KF6::Parts
     KF6::KIOFileWidgets
     KF6::CoreAddons
+    KF6::XmlGui
 )
 
 # Use ECM for standard installation paths and KDE integration
