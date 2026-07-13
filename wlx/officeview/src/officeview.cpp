@@ -245,14 +245,15 @@ public:
         
         proc.start(x2tBin, QStringList() << configXml.fileName());
         if (proc.waitForFinished(10000)) {
-            if (proc.exitCode() != 0) {
-                printf("[OfficeView] x2t conversion failed with exit code %d\n", proc.exitCode());
-                fflush(stdout);
-            } else if (!QFileInfo::exists(outputPath) || QFileInfo(outputPath).size() == 0) {
-                printf("[OfficeView] x2t conversion failed: output PDF is empty or missing\n");
-                fflush(stdout);
-            } else {
+            if (QFileInfo::exists(outputPath) && QFileInfo(outputPath).size() > 0) {
+                if (proc.exitCode() != 0) {
+                    printf("[OfficeView] x2t exited with %d but generated a valid PDF. Proceeding!\n", proc.exitCode());
+                    fflush(stdout);
+                }
                 return true;
+            } else {
+                printf("[OfficeView] x2t conversion failed: exit code %d, output missing or empty\n", proc.exitCode());
+                fflush(stdout);
             }
         } else {
             printf("[OfficeView] x2t conversion timed out or crashed\n");
@@ -287,6 +288,14 @@ private:
 };
 
 // --- Plugin Entry Points ---
+
+__attribute__((destructor))
+static void officeview_unload() {
+    if (pOffice) {
+        pOffice->pClass->destroy(pOffice);
+        pOffice = nullptr;
+    }
+}
 
 extern "C" {
     HWND DCPCALL ListLoad(HWND ParentWin, char* FileToLoad, int ShowFlags) {
