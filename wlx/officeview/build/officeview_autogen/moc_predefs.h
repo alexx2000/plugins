@@ -13,7 +13,6 @@
 #define __BFLT16_DENORM_MIN__ 9.18354961579912115600575419704879436e-41BF16
 #define __INTMAX_C(c) c ## L
 #define __CHAR_BIT__ 8
-#define QT_PDF_LIB 1
 #define __UINT8_MAX__ 0xff
 #define __SCHAR_WIDTH__ 8
 #define __WINT_MAX__ 0xffffffffU
@@ -98,7 +97,6 @@
 #define __FLT32_MAX_10_EXP__ 38
 #define __FLT64X_EPSILON__ 1.08420217248550443400745280086994171e-19F64x
 #define __STDC_HOSTED__ 1
-#define QT_PDFWIDGETS_LIB 1
 #define __DEC64_MIN_EXP__ (-382)
 #define __cpp_decltype_auto 201304L
 #define __DBL_DIG__ 15

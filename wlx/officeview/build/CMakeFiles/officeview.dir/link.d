@@ -3,13 +3,14 @@ officeview.wlx: \
   /usr/lib/gcc/x86_64-pc-linux-gnu/16/crtbeginS.o \
   CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o \
   CMakeFiles/officeview.dir/src/officeview.cpp.o \
-  /usr/lib/libQt6PdfWidgets.so.6.11.1 \
+  CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o \
+  CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o \
   /usr/lib/libQt6Widgets.so.6.11.1 \
-  /usr/lib/libQt6Pdf.so.6.11.1 \
   /usr/lib/libQt6Gui.so.6.11.1 \
   /usr/lib/libGLX.so \
   /usr/lib/libOpenGL.so \
   /usr/lib/libQt6Core.so.6.11.1 \
+  /usr/lib/libmupdf.so \
   /usr/lib/gcc/x86_64-pc-linux-gnu/16/../../../../lib/libstdc++.so \
   /usr/lib/gcc/x86_64-pc-linux-gnu/16/../../../../lib/libm.so \
   /usr/lib/gcc/x86_64-pc-linux-gnu/16/../../../../lib/libm.so \
@@ -47,11 +48,11 @@ CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o:
 
 CMakeFiles/officeview.dir/src/officeview.cpp.o:
 
-/usr/lib/libQt6PdfWidgets.so.6.11.1:
+CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o:
+
+CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o:
 
 /usr/lib/libQt6Widgets.so.6.11.1:
-
-/usr/lib/libQt6Pdf.so.6.11.1:
 
 /usr/lib/libQt6Gui.so.6.11.1:
 
@@ -60,6 +61,8 @@ CMakeFiles/officeview.dir/src/officeview.cpp.o:
 /usr/lib/libOpenGL.so:
 
 /usr/lib/libQt6Core.so.6.11.1:
+
+/usr/lib/libmupdf.so:
 
 /usr/lib/gcc/x86_64-pc-linux-gnu/16/../../../../lib/libstdc++.so:
 

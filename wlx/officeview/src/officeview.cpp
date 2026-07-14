@@ -76,19 +76,36 @@ void setConfigValue(const QString& section, const QString& key, const QString& v
 // ensureConfigFileInitialized() (called once at plugin startup), so this
 // just reads -- it doesn't lazily create missing keys itself, unlike the
 // engine-preference lookups below.
+// Returns the configured limit, or -1 meaning "extension disabled entirely"
+// (checked by the caller before the file-size comparison, not as part of
+// it -- 0 used to be the disable sentinel, but that made a 0-byte file,
+// e.g. an unmaterialized rclone/Google Drive stub, incorrectly pass a
+// "disabled" extension's check, since 0 > 0 is false). Falls back to the
+// 3MB default only when the configured value is missing/malformed, not
+// when it's a deliberate 0 or -1.
 qint64 getMaxFileSizeBytes(const QString& extLower) {
     QString value = getConfigValue("FileSizeLimits", extLower.toUpper(), "");
     bool ok = false;
     qint64 bytes = value.toLongLong(&ok);
-    // 0 is a valid, deliberate value (disables the extension entirely) --
-    // only fall back to the default when the value is missing or malformed.
-    return (ok && bytes >= 0) ? bytes : kDefaultMaxFileSizeBytes;
+    return (ok && bytes >= -1) ? bytes : kDefaultMaxFileSizeBytes;
 }
 
 // ensureConfigFileInitialized() is defined after X2TWrapper/findLibreOfficePath
 // below, since it needs both for engine auto-detection; declared here so
 // ListLoad (defined even later) can call it without forward-declaration noise.
 void ensureConfigFileInitialized();
+
+// A short, centered, no-op message in place of a real preview -- used for
+// every "we're deliberately not going to try rendering this" case (over the
+// size limit, format family disabled, empty/undownloadable file) so they
+// all look and behave the same instead of each reinventing a QLabel.
+QWidget* makeMessageWidget(const QString& text, QWidget* parent) {
+    QLabel* label = new QLabel(text, parent);
+    label->setAlignment(Qt::AlignCenter);
+    label->setWordWrap(true);
+    label->show();
+    return label;
+}
 
 // --- LibreOfficeKit Backend ---
 
@@ -421,6 +438,94 @@ QString findLibreOfficePath() {
         }
     }
     return QString();
+}
+
+// --- Google Drive (via rclone) support ---
+//
+// rclone's Google Drive backend doesn't materialize native Google Docs/
+// Sheets/Slides on read the way it does for regular files -- the mounted
+// filesystem shows a 0-byte "stub" with a .docx/.xlsx/.pptx (or .odt/.ods/
+// .odp, depending on the user's --drive-export-formats config) extension,
+// and any normal file read gets nothing. rclone can still export the real
+// content on demand via `rclone copyto <remote>:<path> <dest>`, which makes
+// an API call to Google and writes back a real Office/ODF file -- that's
+// what this does instead of trying to read the stub directly.
+
+struct RcloneMount {
+    QString mountPoint;   // e.g. /home/user/GoogleDrive
+    QString remotePrefix; // e.g. "gdrive:" -- already includes the trailing
+                          // colon, per /proc/mounts' device field for rclone
+                          // FUSE mounts (confirmed against a live mount).
+};
+
+QVector<RcloneMount> findRcloneMounts() {
+    QVector<RcloneMount> mounts;
+    QFile f("/proc/mounts");
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+        return mounts;
+
+    // Use readAll() + split() rather than QTextStream::readLine(), since
+    // QTextStream::atEnd() reports true immediately on /proc files (they
+    // report size 0), which would make the loop below never execute.
+    const QStringList lines = QString::fromUtf8(f.readAll()).split('\n', Qt::SkipEmptyParts);
+    for (const QString& line : lines) {
+        QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+        if (parts.size() < 3)
+            continue;
+        QString device = parts[0];
+        QString mountPoint = parts[1];
+        QString fstype = parts[2];
+        // /proc/mounts octal-escapes whitespace and backslashes in paths.
+        mountPoint.replace("\\040", " ").replace("\\011", "\t").replace("\\012", "\n").replace("\\134", "\\");
+
+        if (fstype == "fuse.rclone") {
+            RcloneMount m;
+            m.mountPoint = mountPoint;
+            m.remotePrefix = device;
+            mounts.push_back(m);
+        }
+    }
+    return mounts;
+}
+
+// Returns the rclone remote path (e.g. "gdrive:Documents/file.docx") for a
+// local path under an rclone mount, or an empty string if filePath isn't
+// under any rclone mount at all -- the caller's signal that a 0-byte file
+// is genuinely empty/corrupt rather than an unmaterialized Google Docs stub.
+QString rcloneRemotePathFor(const QString& filePath) {
+    for (const RcloneMount& m : findRcloneMounts()) {
+        QString prefix = m.mountPoint;
+        if (!prefix.endsWith('/')) prefix += '/';
+        if (filePath.startsWith(prefix))
+            return m.remotePrefix + filePath.mid(prefix.length());
+    }
+    return QString();
+}
+
+bool rcloneDownload(const QString& remotePath, const QString& destPath) {
+    QString rcloneBin = QStandardPaths::findExecutable("rclone");
+    if (rcloneBin.isEmpty()) {
+        printf("[OfficeView] rcloneDownload: rclone binary not found in PATH\n");
+        fflush(stdout);
+        return false;
+    }
+
+    QProcess proc;
+    proc.start(rcloneBin, QStringList() << "copyto" << remotePath << destPath);
+    // A Drive API export call plus download can take a few seconds for a
+    // large document; generous timeout rather than a fast-failing one.
+    if (!proc.waitForFinished(60000)) {
+        printf("[OfficeView] rcloneDownload: timed out downloading %s\n", remotePath.toUtf8().constData());
+        fflush(stdout);
+        return false;
+    }
+    if (proc.exitCode() != 0) {
+        printf("[OfficeView] rcloneDownload: rclone exited %d for %s: %s\n",
+               proc.exitCode(), remotePath.toUtf8().constData(), proc.readAllStandardError().constData());
+        fflush(stdout);
+        return false;
+    }
+    return QFileInfo::exists(destPath) && QFileInfo(destPath).size() > 0;
 }
 
 // --- Spreadsheet sheet-name extraction (for the sheet-tab UI) ---
@@ -828,7 +933,12 @@ void ensureConfigFileInitialized() {
     if (checkFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QString existing = QString::fromUtf8(checkFile.readAll());
         checkFile.close();
-        if (existing.contains("[Paths]") && existing.contains("[FileSizeLimits]"))
+        // EngineForGDrive is checked too, not just the section headers, so
+        // a config file from before Google Drive support was added gets one
+        // more regeneration pass (which preserves every value the user
+        // already set -- see the pull-forward reads below) instead of
+        // silently missing the new key forever.
+        if (existing.contains("[Paths]") && existing.contains("[FileSizeLimits]") && existing.contains("EngineForGDrive"))
             return; // already in the current format
     }
 
@@ -840,6 +950,7 @@ void ensureConfigFileInitialized() {
     QString engineOOXML = getConfigValue("Settings", "EngineForOOXML", getConfigValue("Engines", "EngineForOOXML", ""));
     QString engineODF = getConfigValue("Settings", "EngineForODF", getConfigValue("Engines", "EngineForODF", ""));
     QString engineLegacyMS = getConfigValue("Settings", "EngineForLegacyMS", getConfigValue("Engines", "EngineForLegacyMS", ""));
+    QString engineGDrive = getConfigValue("Engines", "EngineForGDrive", "");
 
     QMap<QString, qint64> sizeLimits;
     for (const QString& ext : kSizeLimitedExtensionsOrdered) {
@@ -848,7 +959,7 @@ void ensureConfigFileInitialized() {
                                     getConfigValue("FileSizeLimits", extUpper, ""));
         bool ok = false;
         qint64 bytes = v.toLongLong(&ok);
-        sizeLimits[ext] = (ok && bytes >= 0) ? bytes : kDefaultMaxFileSizeBytes;
+        sizeLimits[ext] = (ok && bytes >= -1) ? bytes : kDefaultMaxFileSizeBytes;
     }
 
     if (engineOOXML.isEmpty()) {
@@ -863,6 +974,12 @@ void ensureConfigFileInitialized() {
     }
     if (engineODF.isEmpty()) engineODF = "LibreOffice";
     if (engineLegacyMS.isEmpty()) engineLegacyMS = engineOOXML;
+    // Google Docs/Sheets/Slides export to OOXML (or ODF, depending on the
+    // user's rclone --drive-export-formats setting) -- same file, same
+    // rendering pipeline, but independently configurable since a user might
+    // reasonably want a different engine for gdrive exports than for local
+    // OOXML files.
+    if (engineGDrive.isEmpty()) engineGDrive = engineOOXML;
     if (loPath.isEmpty()) loPath = findLibreOfficePath();
 
     QFile f(confPath);
@@ -875,14 +992,26 @@ void ensureConfigFileInitialized() {
     out << "EuroOfficePath=" << euroPath << "\n";
     out << "OnlyOfficePath=" << onlyPath << "\n";
 
-    out << "\n[Engines]\n";
+    out << "\n; Valid values: EuroOffice, OnlyOffice, LibreOffice, or\n";
+    out << "; Disabled (skip this format family entirely, showing a short\n";
+    out << "; message instead of attempting to render it).\n";
+    out << "[Engines]\n";
     out << "EngineForOOXML=" << engineOOXML << "\n";
     out << "EngineForODF=" << engineODF << "\n";
     out << "EngineForLegacyMS=" << engineLegacyMS << "\n";
+    out << "; Native Google Docs/Sheets/Slides, exported on the fly via\n";
+    out << "; rclone (requires an rclone mount and the rclone binary --\n";
+    out << "; see README.md).\n";
+    out << "EngineForGDrive=" << engineGDrive << "\n";
 
     out << "\n; Size limit in bytes. Files larger than this are not opened at\n";
     out << "; all -- the plugin doesn't attempt to process them. Set a value\n";
-    out << "; to 0 to effectively disable the plugin for that extension.\n";
+    out << "; to -1 to effectively disable the plugin for that extension.\n";
+    out << "; (0 is a valid, if impractical, limit -- only 0-byte files would\n";
+    out << "; pass -- so it's no longer the disable sentinel: a 0-byte file\n";
+    out << "; can legitimately be an unmaterialized rclone/Google Drive stub\n";
+    out << "; that the plugin is about to export and re-check the size of,\n";
+    out << "; not something to reject outright.)\n";
     out << "[FileSizeLimits]\n";
     for (const QString& ext : kSizeLimitedExtensionsOrdered)
         out << ext.toUpper() << "=" << sizeLimits[ext] << "\n";
@@ -910,31 +1039,95 @@ extern "C" {
         // once the file is already in that format.
         ensureConfigFileInitialized();
 
+        // effectiveSourcePath is what actually gets copied into tempSource
+        // below -- filePath itself, unless this turns out to be an
+        // unmaterialized rclone/Google Drive stub, in which case it's the
+        // path rclone exported the real content to.
+        QString effectiveSourcePath = filePath;
+        bool isGDriveExport = false;
+
+        qint64 fileSize = QFileInfo(filePath).size();
+        if (fileSize <= 0 && kSizeLimitedExtensionsOrdered.contains(ext)) {
+            QString remotePath = rcloneRemotePathFor(filePath);
+            if (remotePath.isEmpty()) {
+                // Not under any rclone mount -- a genuinely empty or
+                // corrupt file, not a Google Docs/Sheets/Slides stub.
+                // Fail gracefully instead of handing x2t/LOK a 0-byte file
+                // and letting them fail in some less obvious way.
+                printf("[OfficeView] %s is empty and not under an rclone mount, skipping\n", filePath.toUtf8().constData());
+                fflush(stdout);
+                return (HWND)makeMessageWidget("File is empty.", (QWidget*)ParentWin);
+            }
+
+            QString engineGDrive = getConfigValue("Engines", "EngineForGDrive", "");
+            if (engineGDrive == "Disabled") {
+                return (HWND)makeMessageWidget(
+                    "Google Drive support is disabled (EngineForGDrive=Disabled in officeview.conf).",
+                    (QWidget*)ParentWin);
+            }
+
+            printf("[OfficeView] %s looks like an unmaterialized Google Docs/Sheets/Slides stub, exporting %s via rclone...\n",
+                   filePath.toUtf8().constData(), remotePath.toUtf8().constData());
+            fflush(stdout);
+
+            QTemporaryFile gdriveDownload;
+            gdriveDownload.setFileTemplate(QDir::tempPath() + "/officeview_gdrive_XXXXXX." + ext);
+            if (!gdriveDownload.open()) {
+                return (HWND)makeMessageWidget("Could not create a temporary file for the Google Drive export.", (QWidget*)ParentWin);
+            }
+            QString downloadPath = gdriveDownload.fileName();
+            gdriveDownload.close();
+            // gdriveDownload goes out of scope at the end of this block, and
+            // a QTemporaryFile deletes its underlying file on destruction by
+            // default -- but effectiveSourcePath isn't read into tempSource
+            // until further down, well after that scope ends. Disable
+            // auto-removal so downloadPath survives to be copied; it's
+            // cleaned up explicitly below once that copy is done.
+            gdriveDownload.setAutoRemove(false);
+
+            if (!rcloneDownload(remotePath, downloadPath) || QFileInfo(downloadPath).size() <= 0) {
+                QFile::remove(downloadPath);
+                return (HWND)makeMessageWidget(
+                    QString("Could not export %1 from Google Drive via rclone.\nCheck that rclone is installed, the remote is configured, and you have network access.")
+                        .arg(remotePath),
+                    (QWidget*)ParentWin);
+            }
+
+            effectiveSourcePath = downloadPath;
+            isGDriveExport = true;
+            fileSize = QFileInfo(downloadPath).size();
+            printf("[OfficeView] rclone export succeeded: %s (%lld bytes)\n", downloadPath.toUtf8().constData(), (long long)fileSize);
+            fflush(stdout);
+        }
+
         // Per-extension size limit -- checked before any temp copy or
         // conversion work, so an oversized file costs nothing beyond a
-        // stat() call. Config-driven ([FileSizeLimits] section, see
+        // stat() call (or, for a Google Drive export, right after the
+        // download -- the limit still applies to what we'd actually be
+        // rendering). Config-driven ([FileSizeLimits] section, see
         // getMaxFileSizeBytes), 3MB default, applies to every extension the
         // plugin handles except templates (dot/dotx/xlt/xltx/pot/potx/ott/
         // ots/otp -- none of which are in kSizeLimitedExtensionsOrdered or
-        // _detectstring to begin with).
+        // _detectstring to begin with). A limit of -1 disables the
+        // extension outright, regardless of the file's actual size.
         if (kSizeLimitedExtensionsOrdered.contains(ext)) {
-            qint64 fileSize = QFileInfo(filePath).size();
             qint64 limit = getMaxFileSizeBytes(ext);
+            if (limit < 0) {
+                return (HWND)makeMessageWidget(
+                    QString(".%1 files are disabled (FileSizeLimits.%2 = -1 in officeview.conf).").arg(ext, ext.toUpper()),
+                    (QWidget*)ParentWin);
+            }
             if (fileSize > limit) {
                 printf("[OfficeView] %s (%lld bytes) exceeds the %lld byte limit for .%s, skipping\n",
-                       filePath.toUtf8().constData(), (long long)fileSize, (long long)limit, ext.toUtf8().constData());
+                       effectiveSourcePath.toUtf8().constData(), (long long)fileSize, (long long)limit, ext.toUtf8().constData());
                 fflush(stdout);
-                QLabel* label = new QLabel(
+                return (HWND)makeMessageWidget(
                     QString("File too large to preview (%1 MB, limit %2 MB for .%3 files).\nAdjust [FileSizeLimits] %4 in officeview.conf to change this.")
                         .arg(fileSize / 1048576.0, 0, 'f', 1)
                         .arg(limit / 1048576.0, 0, 'f', 1)
                         .arg(ext)
                         .arg(ext.toUpper()),
                     (QWidget*)ParentWin);
-                label->setAlignment(Qt::AlignCenter);
-                label->setWordWrap(true);
-                label->show();
-                return (HWND)label;
             }
         }
 
@@ -951,7 +1144,7 @@ extern "C" {
         QString enginePrefOOXML = getConfigValue("Engines", "EngineForOOXML", "EuroOffice");
         QString enginePrefODF = getConfigValue("Engines", "EngineForODF", "LibreOffice");
         QString enginePrefLegacyMS = getConfigValue("Engines", "EngineForLegacyMS", enginePrefOOXML);
-
+        QString enginePrefGDrive = getConfigValue("Engines", "EngineForGDrive", enginePrefOOXML);
 
         // Copy to temp file to prevent doublecmd .lock file focus stealing loop
         QTemporaryFile* tempSource = new QTemporaryFile();
@@ -960,23 +1153,37 @@ extern "C" {
             delete tempSource;
             return nullptr;
         }
-        
-        QFile srcFile(filePath);
+
+        QFile srcFile(effectiveSourcePath);
         if (srcFile.open(QIODevice::ReadOnly)) {
             tempSource->write(srcFile.readAll());
             srcFile.close();
         }
         tempSource->close(); // Close so external engines can read it
-        
+
+        if (isGDriveExport) {
+            QFile::remove(effectiveSourcePath); // no longer needed once copied into tempSource
+        }
+
         bool isOOXML = (ext == "docx" || ext == "xlsx" || ext == "pptx" || ext == "docm" || ext == "xlsm" || ext == "pptm");
         bool isODF = (ext == "odt" || ext == "ods" || ext == "odp");
         bool isLegacyMS = (ext == "doc" || ext == "xls" || ext == "ppt");
         bool isSpreadsheet = (ext == "xlsx" || ext == "xlsm" || ext == "ods"); // legacy .xls (BIFF) unsupported for tabs
 
         QString selectedEngine = "LibreOffice";
-        if (isOOXML) selectedEngine = enginePrefOOXML;
+        if (isGDriveExport) selectedEngine = enginePrefGDrive;
+        else if (isOOXML) selectedEngine = enginePrefOOXML;
         else if (isODF) selectedEngine = enginePrefODF;
         else if (isLegacyMS) selectedEngine = enginePrefLegacyMS;
+
+        if (selectedEngine == "Disabled") {
+            delete tempSource;
+            QString familyName = isGDriveExport ? "Google Drive exports" : isOOXML ? ".docx/.xlsx/.pptx (and macro-enabled variants)"
+                                  : isODF ? ".odt/.ods/.odp" : isLegacyMS ? "legacy .doc/.xls/.ppt" : ext;
+            return (HWND)makeMessageWidget(
+                QString("%1 are disabled in officeview.conf.").arg(familyName),
+                (QWidget*)ParentWin);
+        }
 
         // Computed once up front so both the x2t/PdfViewerWidget path and the
         // LibreOfficeKit/LOKContainerWidget path can use it for their tab bars.

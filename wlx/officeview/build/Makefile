@@ -179,6 +179,54 @@ officeview_autogen/mocs_compilation.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/officeview.dir/build.make CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.s
 .PHONY : officeview_autogen/mocs_compilation.cpp.s
 
+src/focus/FocusManager.o: src/focus/FocusManager.cpp.o
+.PHONY : src/focus/FocusManager.o
+
+# target to build an object file
+src/focus/FocusManager.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/officeview.dir/build.make CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o
+.PHONY : src/focus/FocusManager.cpp.o
+
+src/focus/FocusManager.i: src/focus/FocusManager.cpp.i
+.PHONY : src/focus/FocusManager.i
+
+# target to preprocess a source file
+src/focus/FocusManager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/officeview.dir/build.make CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.i
+.PHONY : src/focus/FocusManager.cpp.i
+
+src/focus/FocusManager.s: src/focus/FocusManager.cpp.s
+.PHONY : src/focus/FocusManager.s
+
+# target to generate assembly for a file
+src/focus/FocusManager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/officeview.dir/build.make CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.s
+.PHONY : src/focus/FocusManager.cpp.s
+
+src/mupdfwidget.o: src/mupdfwidget.cpp.o
+.PHONY : src/mupdfwidget.o
+
+# target to build an object file
+src/mupdfwidget.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/officeview.dir/build.make CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o
+.PHONY : src/mupdfwidget.cpp.o
+
+src/mupdfwidget.i: src/mupdfwidget.cpp.i
+.PHONY : src/mupdfwidget.i
+
+# target to preprocess a source file
+src/mupdfwidget.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/officeview.dir/build.make CMakeFiles/officeview.dir/src/mupdfwidget.cpp.i
+.PHONY : src/mupdfwidget.cpp.i
+
+src/mupdfwidget.s: src/mupdfwidget.cpp.s
+.PHONY : src/mupdfwidget.s
+
+# target to generate assembly for a file
+src/mupdfwidget.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/officeview.dir/build.make CMakeFiles/officeview.dir/src/mupdfwidget.cpp.s
+.PHONY : src/mupdfwidget.cpp.s
+
 src/officeview.o: src/officeview.cpp.o
 .PHONY : src/officeview.o
 
@@ -217,6 +265,12 @@ help:
 	@echo "... officeview_autogen/mocs_compilation.o"
 	@echo "... officeview_autogen/mocs_compilation.i"
 	@echo "... officeview_autogen/mocs_compilation.s"
+	@echo "... src/focus/FocusManager.o"
+	@echo "... src/focus/FocusManager.i"
+	@echo "... src/focus/FocusManager.s"
+	@echo "... src/mupdfwidget.o"
+	@echo "... src/mupdfwidget.i"
+	@echo "... src/mupdfwidget.s"
 	@echo "... src/officeview.o"
 	@echo "... src/officeview.i"
 	@echo "... src/officeview.s"

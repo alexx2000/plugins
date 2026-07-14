@@ -106,27 +106,58 @@ CMakeFiles/officeview.dir/src/officeview.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/officeview.dir/src/officeview.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/pplupo/repos/plugins/wlx/officeview/src/officeview.cpp -o CMakeFiles/officeview.dir/src/officeview.cpp.s
 
+CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o: CMakeFiles/officeview.dir/flags.make
+CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o: /home/pplupo/repos/plugins/wlx/officeview/src/focus/FocusManager.cpp
+CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o: CMakeFiles/officeview.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/pplupo/repos/plugins/wlx/officeview/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o -MF CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o.d -o CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o -c /home/pplupo/repos/plugins/wlx/officeview/src/focus/FocusManager.cpp
+
+CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/pplupo/repos/plugins/wlx/officeview/src/focus/FocusManager.cpp > CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.i
+
+CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/pplupo/repos/plugins/wlx/officeview/src/focus/FocusManager.cpp -o CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.s
+
+CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o: CMakeFiles/officeview.dir/flags.make
+CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o: /home/pplupo/repos/plugins/wlx/officeview/src/mupdfwidget.cpp
+CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o: CMakeFiles/officeview.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/pplupo/repos/plugins/wlx/officeview/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o -MF CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o.d -o CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o -c /home/pplupo/repos/plugins/wlx/officeview/src/mupdfwidget.cpp
+
+CMakeFiles/officeview.dir/src/mupdfwidget.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/officeview.dir/src/mupdfwidget.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/pplupo/repos/plugins/wlx/officeview/src/mupdfwidget.cpp > CMakeFiles/officeview.dir/src/mupdfwidget.cpp.i
+
+CMakeFiles/officeview.dir/src/mupdfwidget.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/officeview.dir/src/mupdfwidget.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/pplupo/repos/plugins/wlx/officeview/src/mupdfwidget.cpp -o CMakeFiles/officeview.dir/src/mupdfwidget.cpp.s
+
 # Object files for target officeview
 officeview_OBJECTS = \
 "CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o" \
-"CMakeFiles/officeview.dir/src/officeview.cpp.o"
+"CMakeFiles/officeview.dir/src/officeview.cpp.o" \
+"CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o" \
+"CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o"
 
 # External object files for target officeview
 officeview_EXTERNAL_OBJECTS =
 
 officeview.wlx: CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o
 officeview.wlx: CMakeFiles/officeview.dir/src/officeview.cpp.o
+officeview.wlx: CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o
+officeview.wlx: CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o
 officeview.wlx: CMakeFiles/officeview.dir/build.make
 officeview.wlx: CMakeFiles/officeview.dir/compiler_depend.ts
-officeview.wlx: /usr/lib/libQt6PdfWidgets.so.6.11.1
 officeview.wlx: /usr/lib/libQt6Widgets.so.6.11.1
-officeview.wlx: /usr/lib/libQt6Pdf.so.6.11.1
 officeview.wlx: /usr/lib/libQt6Gui.so.6.11.1
 officeview.wlx: /usr/lib/libGLX.so
 officeview.wlx: /usr/lib/libOpenGL.so
 officeview.wlx: /usr/lib/libQt6Core.so.6.11.1
+officeview.wlx: /usr/lib/libmupdf.so
 officeview.wlx: CMakeFiles/officeview.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/pplupo/repos/plugins/wlx/officeview/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX shared library officeview.wlx"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/pplupo/repos/plugins/wlx/officeview/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Linking CXX shared library officeview.wlx"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/officeview.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

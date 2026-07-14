@@ -342,12 +342,15 @@ CMakeFiles/officeview.dir/src/officeview.cpp.o: \
  /usr/include/qt6/QtWidgets/QScrollArea \
  /usr/include/qt6/QtWidgets/qscrollarea.h \
  /usr/include/qt6/QtWidgets/qabstractscrollarea.h \
- /usr/include/qt6/QtWidgets/qframe.h /usr/include/qt6/QtGui/QPainter \
- /usr/include/qt6/QtGui/qpainter.h /usr/include/qt6/QtGui/qtextoption.h \
- /usr/include/qt6/QtGui/qpen.h /usr/include/qt6/QtGui/QImage \
- /usr/include/qt6/QtCore/QSettings /usr/include/qt6/QtCore/qsettings.h \
- /usr/include/qt6/QtCore/QDir /usr/include/qt6/QtCore/qdir.h \
- /usr/include/qt6/QtCore/qdirlisting.h \
+ /usr/include/qt6/QtWidgets/qframe.h \
+ /usr/include/qt6/QtWidgets/QScrollBar \
+ /usr/include/qt6/QtWidgets/qscrollbar.h \
+ /usr/include/qt6/QtWidgets/qabstractslider.h \
+ /usr/include/qt6/QtGui/QPainter /usr/include/qt6/QtGui/qpainter.h \
+ /usr/include/qt6/QtGui/qtextoption.h /usr/include/qt6/QtGui/qpen.h \
+ /usr/include/qt6/QtGui/QImage /usr/include/qt6/QtCore/QSettings \
+ /usr/include/qt6/QtCore/qsettings.h /usr/include/qt6/QtCore/QDir \
+ /usr/include/qt6/QtCore/qdir.h /usr/include/qt6/QtCore/qdirlisting.h \
  /usr/include/qt6/QtCore/qfiledevice.h \
  /usr/include/qt6/QtCore/qiodevice.h /usr/include/c++/16/filesystem \
  /usr/include/c++/16/bits/fs_fwd.h /usr/include/c++/16/bits/fs_path.h \
@@ -388,20 +391,14 @@ CMakeFiles/officeview.dir/src/officeview.cpp.o: \
  /usr/include/qt6/QtCore/QRect /usr/include/qt6/QtCore/QSize \
  /usr/include/qt6/QtCore/QSizeF /usr/include/qt6/QtGui/QTransform \
  /usr/include/qt6/QtGui/qscreen_platform.h \
+ /usr/include/qt6/QtGui/QKeyEvent /usr/include/qt6/QtGui/QWheelEvent \
+ /usr/include/qt6/QtGui/QContextMenuEvent \
+ /usr/include/qt6/QtWidgets/QMenu /usr/include/qt6/QtWidgets/qmenu.h \
+ /usr/include/qt6/QtGui/QClipboard /usr/include/qt6/QtGui/qclipboard.h \
  /usr/include/qt6/QtCore/QTemporaryFile \
  /usr/include/qt6/QtCore/qtemporaryfile.h \
- /usr/include/qt6/QtPdf/QPdfDocument \
- /usr/include/qt6/QtPdf/qpdfdocument.h \
- /usr/include/qt6/QtPdf/qtpdfglobal.h \
- /usr/include/qt6/QtPdf/qtpdfexports.h \
- /usr/include/qt6/QtCore/QAbstractListModel \
- /usr/include/qt6/QtCore/qabstractitemmodel.h \
- /usr/include/qt6/QtPdf/qpdfdocumentrenderoptions.h \
- /usr/include/qt6/QtPdf/qpdfselection.h \
- /usr/include/qt6/QtGui/qclipboard.h \
- /usr/include/qt6/QtPdfWidgets/QPdfView \
- /usr/include/qt6/QtPdfWidgets/qpdfview.h \
- /usr/include/qt6/QtPdfWidgets/qtpdfwidgetsglobal.h \
+ /usr/include/qt6/QtCore/QTemporaryDir \
+ /usr/include/qt6/QtCore/qtemporarydir.h \
  /usr/include/qt6/QtWidgets/QVBoxLayout \
  /usr/include/qt6/QtWidgets/qboxlayout.h \
  /usr/include/qt6/QtWidgets/qlayout.h \
@@ -409,8 +406,56 @@ CMakeFiles/officeview.dir/src/officeview.cpp.o: \
  /usr/include/qt6/QtWidgets/qgridlayout.h \
  /usr/include/qt6/QtCore/QProcess /usr/include/qt6/QtCore/qprocess.h \
  /usr/include/qt6/QtCore/QProcessEnvironment \
+ /usr/include/qt6/QtCore/QRegularExpression \
+ /usr/include/qt6/QtCore/qregularexpression.h \
+ /usr/include/qt6/QtCore/QSet /usr/include/qt6/QtCore/QTextStream \
+ /usr/include/qt6/QtCore/QMap /usr/include/qt6/QtWidgets/QLabel \
+ /usr/include/qt6/QtWidgets/qlabel.h /usr/include/qt6/QtGui/qpicture.h \
+ /usr/include/qt6/QtGui/qtextdocument.h \
+ /usr/include/qt6/QtWidgets/QTabBar /usr/include/qt6/QtWidgets/qtabbar.h \
  /home/pplupo/repos/plugins/wlx/officeview/../../sdk/wlxplugin.h \
  /home/pplupo/repos/plugins/wlx/officeview/../../sdk/common.h \
+ /home/pplupo/repos/plugins/wlx/officeview/src/focus/FocusManager.h \
+ /usr/include/qt6/QtCore/QObject /usr/include/qt6/QtCore/QPointer \
+ /usr/include/qt6/QtCore/qpointer.h /usr/include/qt6/QtGui/QKeySequence \
+ /usr/include/qt6/QtCore/QVector /usr/include/qt6/QtCore/qvector.h \
+ /usr/include/qt6/QtCore/QElapsedTimer \
+ /usr/include/qt6/QtCore/qelapsedtimer.h \
+ /home/pplupo/repos/plugins/wlx/officeview/src/mupdfwidget.h \
+ /usr/include/mupdf/fitz.h /usr/include/mupdf/fitz/version.h \
+ /usr/include/mupdf/fitz/config.h /usr/include/mupdf/fitz/system.h \
+ /usr/include/setjmp.h /usr/include/mupdf/fitz/export.h \
+ /usr/include/mupdf/memento.h /usr/include/mupdf/fitz/track-usage.h \
+ /usr/include/mupdf/fitz/context.h /usr/include/mupdf/fitz/geometry.h \
+ /usr/include/c++/16/math.h /usr/include/mupdf/fitz/output.h \
+ /usr/include/mupdf/fitz/buffer.h /usr/include/mupdf/fitz/string-util.h \
+ /usr/include/mupdf/fitz/stream.h /usr/include/mupdf/fitz/log.h \
+ /usr/include/mupdf/fitz/crypt.h /usr/include/mupdf/fitz/getopt.h \
+ /usr/include/mupdf/fitz/hash.h /usr/include/mupdf/fitz/pool.h \
+ /usr/include/mupdf/fitz/tree.h /usr/include/mupdf/fitz/bidi.h \
+ /usr/include/mupdf/fitz/xml.h /usr/include/mupdf/fitz/archive.h \
+ /usr/include/mupdf/fitz/json.h /usr/include/mupdf/fitz/hyphen.h \
+ /usr/include/mupdf/fitz/types.h /usr/include/mupdf/fitz/text.h \
+ /usr/include/mupdf/fitz/font.h /usr/include/mupdf/fitz/color.h \
+ /usr/include/mupdf/fitz/store.h /usr/include/mupdf/fitz/path.h \
+ /usr/include/mupdf/fitz/compress.h /usr/include/mupdf/fitz/pixmap.h \
+ /usr/include/mupdf/fitz/separation.h \
+ /usr/include/mupdf/fitz/compressed-buffer.h \
+ /usr/include/mupdf/fitz/filter.h /usr/include/mupdf/fitz/heap.h \
+ /usr/include/mupdf/fitz/heap-imp.h /usr/include/mupdf/fitz/image.h \
+ /usr/include/mupdf/fitz/bitmap.h /usr/include/mupdf/fitz/shade.h \
+ /usr/include/mupdf/fitz/glyph.h /usr/include/mupdf/fitz/device.h \
+ /usr/include/mupdf/fitz/display-list.h \
+ /usr/include/mupdf/fitz/structured-text.h \
+ /usr/include/mupdf/fitz/transition.h \
+ /usr/include/mupdf/fitz/glyph-cache.h /usr/include/mupdf/fitz/link.h \
+ /usr/include/mupdf/fitz/outline.h /usr/include/mupdf/fitz/document.h \
+ /usr/include/mupdf/fitz/util.h /usr/include/mupdf/fitz/writer.h \
+ /usr/include/mupdf/fitz/band-writer.h \
+ /usr/include/mupdf/fitz/write-pixmap.h \
+ /usr/include/mupdf/fitz/output-svg.h /usr/include/mupdf/fitz/story.h \
+ /usr/include/mupdf/fitz/story-writer.h /usr/include/mupdf/fitz/deskew.h \
+ /usr/include/mupdf/fitz/barcode.h /usr/include/qt6/QtCore/QStringList \
  /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKitEnums.h \
  /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKitInit.h \
  /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKit.h \
@@ -421,4 +466,8 @@ CMakeFiles/officeview.dir/src/officeview.cpp.o: \
  /usr/include/bits/types/struct_statx_timestamp.h \
  /usr/include/bits/types/struct_statx.h /usr/include/dlfcn.h \
  /usr/include/bits/dlfcn.h /usr/include/bits/dl_find_object.h \
- /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKit.h
+ /home/pplupo/repos/plugins/wlx/officeview/LibreOfficeKit/LibreOfficeKit.h \
+ /home/pplupo/repos/plugins/wlx/officeview/build/officeview_autogen/include/officeview.moc \
+ /usr/include/qt6/QtCore/qtmochelpers.h \
+ /usr/include/qt6/QtCore/qtmocconstants.h \
+ /usr/include/qt6/QtCore/q20algorithm.h

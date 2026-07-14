@@ -1,8 +1,7 @@
-CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o: \
- /home/pplupo/repos/plugins/wlx/officeview/build/officeview_autogen/mocs_compilation.cpp \
+CMakeFiles/officeview.dir/src/focus/FocusManager.cpp.o: \
+ /home/pplupo/repos/plugins/wlx/officeview/src/focus/FocusManager.cpp \
  /usr/include/stdc-predef.h \
- /home/pplupo/repos/plugins/wlx/officeview/build/officeview_autogen/TL34MO5L6K/moc_FocusManager.cpp \
- /home/pplupo/repos/plugins/wlx/officeview/build/officeview_autogen/TL34MO5L6K/../../../src/focus/FocusManager.h \
+ /home/pplupo/repos/plugins/wlx/officeview/src/focus/FocusManager.h \
  /usr/include/qt6/QtCore/QObject /usr/include/qt6/QtCore/qobject.h \
  /usr/include/qt6/QtCore/qobjectdefs.h \
  /usr/include/qt6/QtCore/qnamespace.h /usr/include/qt6/QtCore/qglobal.h \
@@ -334,73 +333,30 @@ CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o: \
  /usr/include/qt6/QtCore/QVector /usr/include/qt6/QtCore/qvector.h \
  /usr/include/qt6/QtCore/QElapsedTimer \
  /usr/include/qt6/QtCore/qelapsedtimer.h \
- /usr/include/qt6/QtCore/qtmochelpers.h \
- /usr/include/qt6/QtCore/qtmocconstants.h \
- /usr/include/qt6/QtCore/q20algorithm.h \
- /home/pplupo/repos/plugins/wlx/officeview/build/officeview_autogen/UVLADIE3JM/moc_mupdfwidget.cpp \
- /home/pplupo/repos/plugins/wlx/officeview/build/officeview_autogen/UVLADIE3JM/../../../src/mupdfwidget.h \
- /usr/include/mupdf/fitz.h /usr/include/mupdf/fitz/version.h \
- /usr/include/mupdf/fitz/config.h /usr/include/mupdf/fitz/system.h \
- /usr/include/setjmp.h /usr/include/mupdf/fitz/export.h \
- /usr/include/mupdf/memento.h /usr/include/mupdf/fitz/track-usage.h \
- /usr/include/mupdf/fitz/context.h /usr/include/mupdf/fitz/geometry.h \
- /usr/include/c++/16/math.h /usr/include/mupdf/fitz/output.h \
- /usr/include/mupdf/fitz/buffer.h /usr/include/mupdf/fitz/string-util.h \
- /usr/include/mupdf/fitz/stream.h /usr/include/mupdf/fitz/log.h \
- /usr/include/mupdf/fitz/crypt.h /usr/include/mupdf/fitz/getopt.h \
- /usr/include/mupdf/fitz/hash.h /usr/include/mupdf/fitz/pool.h \
- /usr/include/mupdf/fitz/tree.h /usr/include/mupdf/fitz/bidi.h \
- /usr/include/mupdf/fitz/xml.h /usr/include/mupdf/fitz/archive.h \
- /usr/include/mupdf/fitz/json.h /usr/include/mupdf/fitz/hyphen.h \
- /usr/include/mupdf/fitz/types.h /usr/include/mupdf/fitz/text.h \
- /usr/include/mupdf/fitz/font.h /usr/include/mupdf/fitz/color.h \
- /usr/include/mupdf/fitz/store.h /usr/include/mupdf/fitz/path.h \
- /usr/include/mupdf/fitz/compress.h /usr/include/mupdf/fitz/pixmap.h \
- /usr/include/mupdf/fitz/separation.h \
- /usr/include/mupdf/fitz/compressed-buffer.h \
- /usr/include/mupdf/fitz/filter.h /usr/include/mupdf/fitz/heap.h \
- /usr/include/mupdf/fitz/heap-imp.h /usr/include/mupdf/fitz/image.h \
- /usr/include/mupdf/fitz/bitmap.h /usr/include/mupdf/fitz/shade.h \
- /usr/include/mupdf/fitz/glyph.h /usr/include/mupdf/fitz/device.h \
- /usr/include/mupdf/fitz/display-list.h \
- /usr/include/mupdf/fitz/structured-text.h \
- /usr/include/mupdf/fitz/transition.h \
- /usr/include/mupdf/fitz/glyph-cache.h /usr/include/mupdf/fitz/link.h \
- /usr/include/mupdf/fitz/outline.h /usr/include/mupdf/fitz/document.h \
- /usr/include/mupdf/fitz/util.h /usr/include/mupdf/fitz/writer.h \
- /usr/include/mupdf/fitz/band-writer.h \
- /usr/include/mupdf/fitz/write-pixmap.h \
- /usr/include/mupdf/fitz/output-svg.h /usr/include/mupdf/fitz/story.h \
- /usr/include/mupdf/fitz/story-writer.h /usr/include/mupdf/fitz/deskew.h \
- /usr/include/mupdf/fitz/barcode.h /usr/include/qt6/QtWidgets/QScrollArea \
- /usr/include/qt6/QtWidgets/qscrollarea.h \
- /usr/include/qt6/QtWidgets/qabstractscrollarea.h \
- /usr/include/qt6/QtWidgets/qframe.h /usr/include/qt6/QtCore/QMap \
- /usr/include/qt6/QtCore/QStringList \
- /usr/include/qt6/QtCore/QTemporaryFile \
- /usr/include/qt6/QtCore/qtemporaryfile.h \
- /usr/include/qt6/QtCore/qiodevice.h /usr/include/qt6/QtCore/qfile.h \
- /usr/include/qt6/QtCore/qfiledevice.h /usr/include/c++/16/filesystem \
- /usr/include/c++/16/bits/fs_fwd.h /usr/include/c++/16/bits/fs_path.h \
- /usr/include/c++/16/locale /usr/include/c++/16/bits/locale_facets.h \
- /usr/include/c++/16/cwctype /usr/include/wctype.h \
- /usr/include/bits/wctype-wchar.h \
- /usr/include/c++/16/x86_64-pc-linux-gnu/bits/ctype_base.h \
- /usr/include/c++/16/x86_64-pc-linux-gnu/bits/ctype_inline.h \
- /usr/include/c++/16/bits/locale_facets.tcc \
- /usr/include/c++/16/bits/locale_facets_nonio.h \
- /usr/include/c++/16/x86_64-pc-linux-gnu/bits/time_members.h \
- /usr/include/c++/16/x86_64-pc-linux-gnu/bits/messages_members.h \
- /usr/include/libintl.h /usr/include/c++/16/bits/codecvt.h \
- /usr/include/c++/16/bits/locale_facets_nonio.tcc \
- /usr/include/c++/16/bits/locale_conv.h /usr/include/c++/16/iomanip \
- /usr/include/c++/16/bits/quoted_string.h /usr/include/c++/16/sstream \
- /usr/include/c++/16/istream /usr/include/c++/16/ios \
- /usr/include/c++/16/bits/basic_ios.h \
- /usr/include/c++/16/bits/basic_ios.tcc /usr/include/c++/16/ostream \
- /usr/include/c++/16/bits/ostream.h \
- /usr/include/c++/16/bits/ostream_print.h \
- /usr/include/c++/16/bits/ostream.tcc \
- /usr/include/c++/16/bits/istream.tcc \
- /usr/include/c++/16/bits/sstream.tcc /usr/include/c++/16/codecvt \
- /usr/include/c++/16/bits/fs_dir.h /usr/include/c++/16/bits/fs_ops.h
+ /usr/include/qt6/QtWidgets/QApplication \
+ /usr/include/qt6/QtWidgets/qapplication.h \
+ /usr/include/qt6/QtCore/qcoreapplication.h \
+ /usr/include/qt6/QtCore/qcoreevent.h \
+ /usr/include/qt6/QtCore/qbasictimer.h \
+ /usr/include/qt6/QtCore/qabstracteventdispatcher.h \
+ /usr/include/qt6/QtCore/qeventloop.h \
+ /usr/include/qt6/QtCore/qdeadlinetimer.h \
+ /usr/include/qt6/QtCore/qnativeinterface.h \
+ /usr/include/qt6/QtCore/qcoreapplication_platform.h \
+ /usr/include/qt6/QtGui/qguiapplication.h \
+ /usr/include/qt6/QtGui/qinputmethod.h /usr/include/qt6/QtCore/qlocale.h \
+ /usr/include/qt6/QtGui/qguiapplication_platform.h \
+ /usr/include/qt6/QtGui/QKeyEvent /usr/include/qt6/QtGui/qevent.h \
+ /usr/include/qt6/QtCore/qiodevice.h /usr/include/qt6/QtCore/qurl.h \
+ /usr/include/qt6/QtGui/qeventpoint.h /usr/include/qt6/QtGui/qvector2d.h \
+ /usr/include/qt6/QtGui/qvectornd.h \
+ /usr/include/qt6/QtGui/qpointingdevice.h \
+ /usr/include/qt6/QtGui/qinputdevice.h /usr/include/qt6/QtGui/qscreen.h \
+ /usr/include/qt6/QtCore/QList /usr/include/qt6/QtCore/QObject \
+ /usr/include/qt6/QtCore/QRect /usr/include/qt6/QtCore/QSize \
+ /usr/include/qt6/QtCore/QSizeF /usr/include/qt6/QtGui/QTransform \
+ /usr/include/qt6/QtGui/qscreen_platform.h \
+ /usr/include/qt6/QtGui/QMouseEvent /usr/include/qt6/QtGui/QFocusEvent \
+ /usr/include/qt6/QtCore/QChildEvent /usr/include/qt6/QtCore/QTimer \
+ /usr/include/qt6/QtCore/qtimer.h /usr/include/qt6/QtGui/QUndoStack \
+ /usr/include/qt6/QtGui/qundostack.h

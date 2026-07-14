@@ -3,7 +3,9 @@
 A Double Commander WLX lister plugin that previews Microsoft Office and
 OpenDocument files (Word/Excel/PowerPoint and their legacy/macro-enabled
 variants, plus ODT/ODS/ODP) directly in Double Commander's Quick View panel
-and file lister, without opening a separate editor.
+and file lister, without opening a separate editor. It can also preview
+native Google Docs/Sheets/Slides files under an `rclone` mount (see
+[Google Drive support](#google-drive-support-via-rclone) below).
 
 ## What it does
 
@@ -22,6 +24,11 @@ and file lister, without opening a separate editor.
   rendering paths.
 - Per-extension file size limits, so a very large document is skipped
   instead of stalling the preview panel.
+- Exports and previews native Google Docs/Sheets/Slides files mounted via
+  `rclone` (see below) -- these don't have real content on disk until
+  exported, and the plugin handles that transparently.
+- Any format family (OOXML, ODF, legacy MS, or Google Drive exports) can
+  be turned off entirely via config.
 
 Supported extensions (also what the plugin reports to Double Commander via
 its detect string, i.e. which files it offers to preview): `DOC`, `DOCX`,
@@ -54,6 +61,41 @@ detected for the other formats. This is deliberate, not a fallback:
 LibreOffice's ODF rendering fidelity is meaningfully better than x2t's for
 this format family.
 
+## Google Drive support (via rclone)
+
+Google Docs, Sheets, and Slides are native Google formats -- when `rclone`
+mounts a Google Drive remote (`rclone mount gdrive: ~/GoogleDrive`), it
+can't materialize their content as a real file on read the way it does for
+an actual `.docx` sitting in Drive. What you see on disk is a **0-byte
+stub** with a `.docx`/`.xlsx`/`.pptx` (or `.odt`/`.ods`/`.odp`, depending
+on your `--drive-export-formats` rclone setting) extension -- reading it
+directly just gets you nothing.
+
+`rclone` can still export the real content on demand via its `copyto`
+command, which makes a Google Drive API call and writes back a real
+Office/ODF file. **This plugin requires `rclone` to already be installed,
+in `PATH`, and to have a working Google Drive remote configured and
+mounted** -- it doesn't set any of that up itself. When it encounters a
+0-byte file under a live `fuse.rclone` mount (detected via `/proc/mounts`),
+it runs the equivalent of:
+
+```bash
+rclone copyto "gdrive:Documents/Resume/Peter_Lupo_Resume_Old.docx" /tmp/downloaded.docx
+```
+
+...and previews the downloaded file instead of the stub. This can take a
+few seconds (it's a real network call to Google), and the resulting file
+still goes through the normal size-limit check (see below) and the
+same OOXML/ODF rendering path as any other file of that extension --
+Google Drive exports are just an independently-configurable "format
+family" for engine selection purposes (`EngineForGDrive`), not a separate
+rendering path.
+
+If a 0-byte file is **not** under an `rclone` mount, or the `rclone`
+export fails (not installed, network error, remote not configured), the
+plugin fails gracefully with a short message instead of trying to render
+an empty file.
+
 ## Configuration
 
 Config file: `~/.config/doublecmd/officeview.conf` (INI format, created/
@@ -65,14 +107,26 @@ LibreOfficePath=/usr/lib/libreoffice/program
 EuroOfficePath=/opt/euro-office/desktopeditors
 OnlyOfficePath=
 
+; Valid values: EuroOffice, OnlyOffice, LibreOffice, or
+; Disabled (skip this format family entirely, showing a short
+; message instead of attempting to render it).
 [Engines]
 EngineForOOXML=EuroOffice
 EngineForODF=LibreOffice
 EngineForLegacyMS=EuroOffice
+; Native Google Docs/Sheets/Slides, exported on the fly via
+; rclone (requires an rclone mount and the rclone binary --
+; see README.md).
+EngineForGDrive=EuroOffice
 
 ; Size limit in bytes. Files larger than this are not opened at
 ; all -- the plugin doesn't attempt to process them. Set a value
-; to 0 to effectively disable the plugin for that extension.
+; to -1 to effectively disable the plugin for that extension.
+; (0 is a valid, if impractical, limit -- only 0-byte files would
+; pass -- so it's no longer the disable sentinel: a 0-byte file
+; can legitimately be an unmaterialized rclone/Google Drive stub
+; that the plugin is about to export and re-check the size of,
+; not something to reject outright.)
 [FileSizeLimits]
 DOC=3145728
 DOCX=3145728
@@ -101,12 +155,22 @@ paths. `LO_PATH` (environment variable) always takes priority over
 Which engine each format family uses:
 
 - `EngineForOOXML` -- for DOCX/XLSX/PPTX/DOCM/XLSM/PPTM. Valid values:
-  `EuroOffice`, `OnlyOffice`, `LibreOffice`.
+  `EuroOffice`, `OnlyOffice`, `LibreOffice`, or `Disabled`.
 - `EngineForODF` -- for ODT/ODS/ODP. In practice this should stay
   `LibreOffice` (see above), but the setting exists if you want to
-  experiment with routing ODF through x2t instead.
+  experiment with routing ODF through x2t instead, or set it to
+  `Disabled`.
 - `EngineForLegacyMS` -- for DOC/XLS/PPT. Same valid values as
   `EngineForOOXML`.
+- `EngineForGDrive` -- for files exported from a native Google Docs/
+  Sheets/Slides stub via `rclone` (see above). Same valid values. Defaults
+  to whatever `EngineForOOXML` resolved to, but is independently
+  configurable -- you might reasonably want a different engine for
+  Google Drive exports than for local OOXML files.
+
+Setting any of these to **`Disabled`** turns off that entire format family:
+matching files show a short "disabled" message instead of any attempt to
+render them, and no conversion/download work happens at all.
 
 Edit these directly to force a specific engine per format family instead
 of relying on auto-detection.
@@ -115,9 +179,11 @@ of relying on auto-detection.
 
 One entry per extension, in **bytes**. A file larger than its extension's
 limit is not opened or processed at all -- the plugin declines up front,
-before any conversion work happens, and shows a short message explaining
-why instead of attempting to render it. Set an extension's value to `0`
-to disable previewing for that extension entirely.
+before any conversion work happens (for a Google Drive export, this check
+runs against the downloaded file's real size, right after the download),
+and shows a short message explaining why instead of attempting to render
+it. Set an extension's value to **`-1`** to disable previewing for that
+extension entirely, regardless of size.
 
 ## Known limitations
 
@@ -137,3 +203,7 @@ to disable previewing for that extension entirely.
   render correctly -- multi-page pagination works fine -- just without a
   way to jump between sheets; you only see whichever sheet the file
   itself opens to.
+- **Google Drive support requires `rclone` to be installed and already
+  configured/mounted.** The plugin only detects and uses an existing
+  mount (via `/proc/mounts`) and calls `rclone copyto` to export a stub's
+  content -- it doesn't install, configure, or mount `rclone` itself.

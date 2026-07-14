@@ -1,32 +1,127 @@
-CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o: \
- /home/pplupo/repos/plugins/wlx/officeview/build/officeview_autogen/mocs_compilation.cpp \
+CMakeFiles/officeview.dir/src/mupdfwidget.cpp.o: \
+ /home/pplupo/repos/plugins/wlx/officeview/src/mupdfwidget.cpp \
  /usr/include/stdc-predef.h \
- /home/pplupo/repos/plugins/wlx/officeview/build/officeview_autogen/TL34MO5L6K/moc_FocusManager.cpp \
- /home/pplupo/repos/plugins/wlx/officeview/build/officeview_autogen/TL34MO5L6K/../../../src/focus/FocusManager.h \
- /usr/include/qt6/QtCore/QObject /usr/include/qt6/QtCore/qobject.h \
- /usr/include/qt6/QtCore/qobjectdefs.h \
- /usr/include/qt6/QtCore/qnamespace.h /usr/include/qt6/QtCore/qglobal.h \
- /usr/include/c++/16/type_traits \
+ /home/pplupo/repos/plugins/wlx/officeview/src/mupdfwidget.h \
+ /usr/include/mupdf/fitz.h /usr/include/mupdf/fitz/version.h \
+ /usr/include/mupdf/fitz/config.h /usr/include/mupdf/fitz/system.h \
+ /usr/lib/gcc/x86_64-pc-linux-gnu/16/include/stddef.h \
+ /usr/lib/gcc/x86_64-pc-linux-gnu/16/include/stdarg.h \
+ /usr/include/setjmp.h /usr/include/features.h \
+ /usr/include/features-time64.h /usr/include/bits/wordsize.h \
+ /usr/include/bits/timesize.h /usr/include/sys/cdefs.h \
+ /usr/include/bits/long-double.h /usr/include/gnu/stubs.h \
+ /usr/include/gnu/stubs-64.h /usr/include/bits/setjmp.h \
+ /usr/include/bits/types/struct___jmp_buf_tag.h \
+ /usr/include/bits/types/__sigset_t.h /usr/include/stdio.h \
+ /usr/include/bits/libc-header-start.h /usr/include/bits/types.h \
+ /usr/include/bits/typesizes.h /usr/include/bits/time64.h \
+ /usr/include/bits/types/__fpos_t.h /usr/include/bits/types/__mbstate_t.h \
+ /usr/include/bits/types/__fpos64_t.h /usr/include/bits/types/__FILE.h \
+ /usr/include/bits/types/FILE.h /usr/include/bits/types/struct_FILE.h \
+ /usr/include/bits/types/cookie_io_functions_t.h \
+ /usr/include/bits/stdio_lim.h /usr/include/bits/floatn.h \
+ /usr/include/bits/floatn-common.h /usr/include/mupdf/fitz/export.h \
+ /usr/lib/gcc/x86_64-pc-linux-gnu/16/include/stdint.h \
+ /usr/include/stdint.h /usr/include/bits/wchar.h \
+ /usr/include/bits/stdint-intn.h /usr/include/bits/stdint-uintn.h \
+ /usr/include/bits/stdint-least.h /usr/include/mupdf/memento.h \
+ /usr/include/string.h /usr/include/bits/types/locale_t.h \
+ /usr/include/bits/types/__locale_t.h /usr/include/strings.h \
+ /usr/include/c++/16/stdlib.h /usr/include/c++/16/cstdlib \
  /usr/include/c++/16/x86_64-pc-linux-gnu/bits/c++config.h \
  /usr/include/c++/16/x86_64-pc-linux-gnu/bits/os_defines.h \
- /usr/include/features.h /usr/include/features-time64.h \
- /usr/include/bits/wordsize.h /usr/include/bits/timesize.h \
- /usr/include/sys/cdefs.h /usr/include/bits/long-double.h \
- /usr/include/gnu/stubs.h /usr/include/gnu/stubs-64.h \
  /usr/include/c++/16/x86_64-pc-linux-gnu/bits/cpu_defines.h \
- /usr/include/c++/16/pstl/pstl_config.h \
- /usr/include/c++/16/bits/version.h /usr/include/c++/16/cstddef \
- /usr/lib/gcc/x86_64-pc-linux-gnu/16/include/stddef.h \
- /usr/include/c++/16/utility /usr/include/c++/16/bits/stl_relops.h \
+ /usr/include/c++/16/pstl/pstl_config.h /usr/include/stdlib.h \
+ /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
+ /usr/include/sys/types.h /usr/include/bits/types/clock_t.h \
+ /usr/include/bits/types/clockid_t.h /usr/include/bits/types/time_t.h \
+ /usr/include/bits/types/timer_t.h /usr/include/endian.h \
+ /usr/include/bits/endian.h /usr/include/bits/endianness.h \
+ /usr/include/bits/byteswap.h /usr/include/bits/uintn-identity.h \
+ /usr/include/sys/select.h /usr/include/bits/select.h \
+ /usr/include/bits/types/sigset_t.h \
+ /usr/include/bits/types/struct_timeval.h \
+ /usr/include/bits/types/struct_timespec.h \
+ /usr/include/bits/pthreadtypes.h /usr/include/bits/thread-shared-types.h \
+ /usr/include/bits/pthreadtypes-arch.h \
+ /usr/include/bits/atomic_wide_counter.h /usr/include/bits/struct_mutex.h \
+ /usr/include/bits/struct_rwlock.h /usr/include/alloca.h \
+ /usr/include/bits/stdlib-float.h /usr/include/c++/16/bits/std_abs.h \
+ /usr/include/mupdf/fitz/track-usage.h /usr/include/mupdf/fitz/context.h \
+ /usr/include/mupdf/fitz/geometry.h /usr/include/c++/16/math.h \
+ /usr/include/c++/16/cmath /usr/include/c++/16/bits/requires_hosted.h \
+ /usr/include/c++/16/bits/cpp_type_traits.h \
+ /usr/include/c++/16/bits/version.h /usr/include/c++/16/type_traits \
+ /usr/include/c++/16/ext/type_traits.h /usr/include/math.h \
+ /usr/include/bits/math-vector.h /usr/include/bits/libm-simd-decl-stubs.h \
+ /usr/include/bits/flt-eval-method.h /usr/include/bits/fp-logb.h \
+ /usr/include/bits/fp-fast.h /usr/include/bits/mathcalls-macros.h \
+ /usr/include/bits/mathcalls-helper-functions.h \
+ /usr/include/bits/mathcalls.h /usr/include/bits/mathcalls-narrow.h \
+ /usr/include/bits/iscanonical.h /usr/include/c++/16/bits/specfun.h \
+ /usr/include/c++/16/bits/stdexcept_throw.h \
+ /usr/include/c++/16/bits/exception_defines.h \
+ /usr/include/c++/16/bits/stdexcept_throwfwd.h \
+ /usr/include/c++/16/bits/stl_algobase.h \
+ /usr/include/c++/16/ext/numeric_traits.h \
  /usr/include/c++/16/bits/stl_pair.h /usr/include/c++/16/bits/move.h \
- /usr/include/c++/16/bits/utility.h /usr/include/c++/16/initializer_list \
- /usr/include/c++/16/cstdint \
- /usr/lib/gcc/x86_64-pc-linux-gnu/16/include/stdint.h \
- /usr/include/stdint.h /usr/include/bits/libc-header-start.h \
- /usr/include/bits/types.h /usr/include/bits/typesizes.h \
- /usr/include/bits/time64.h /usr/include/bits/wchar.h \
- /usr/include/bits/stdint-intn.h /usr/include/bits/stdint-uintn.h \
- /usr/include/bits/stdint-least.h /usr/include/assert.h \
+ /usr/include/c++/16/bits/utility.h \
+ /usr/include/c++/16/bits/stl_iterator_base_types.h \
+ /usr/include/c++/16/bits/stl_iterator_base_funcs.h \
+ /usr/include/c++/16/bits/concept_check.h \
+ /usr/include/c++/16/debug/assertions.h \
+ /usr/include/c++/16/bits/stl_iterator.h \
+ /usr/include/c++/16/bits/ptr_traits.h /usr/include/c++/16/debug/debug.h \
+ /usr/include/c++/16/bits/predefined_ops.h \
+ /usr/include/c++/16/bits/stl_function.h \
+ /usr/include/c++/16/backward/binders.h /usr/include/c++/16/bit \
+ /usr/include/c++/16/concepts /usr/include/c++/16/limits \
+ /usr/include/c++/16/tr1/gamma.tcc \
+ /usr/include/c++/16/tr1/special_function_util.h \
+ /usr/include/c++/16/tr1/bessel_function.tcc \
+ /usr/include/c++/16/tr1/beta_function.tcc \
+ /usr/include/c++/16/tr1/ell_integral.tcc \
+ /usr/include/c++/16/tr1/exp_integral.tcc \
+ /usr/include/c++/16/tr1/hypergeometric.tcc \
+ /usr/include/c++/16/tr1/legendre_function.tcc \
+ /usr/include/c++/16/tr1/modified_bessel_func.tcc \
+ /usr/include/c++/16/tr1/poly_hermite.tcc \
+ /usr/include/c++/16/tr1/poly_laguerre.tcc \
+ /usr/include/c++/16/tr1/riemann_zeta.tcc /usr/include/assert.h \
+ /usr/include/mupdf/fitz/output.h /usr/include/mupdf/fitz/buffer.h \
+ /usr/include/mupdf/fitz/string-util.h /usr/include/mupdf/fitz/stream.h \
+ /usr/include/mupdf/fitz/log.h /usr/include/mupdf/fitz/crypt.h \
+ /usr/include/mupdf/fitz/getopt.h /usr/include/mupdf/fitz/hash.h \
+ /usr/include/mupdf/fitz/pool.h /usr/include/mupdf/fitz/tree.h \
+ /usr/include/mupdf/fitz/bidi.h /usr/include/mupdf/fitz/xml.h \
+ /usr/include/mupdf/fitz/archive.h /usr/include/mupdf/fitz/json.h \
+ /usr/include/mupdf/fitz/hyphen.h /usr/include/mupdf/fitz/types.h \
+ /usr/include/mupdf/fitz/text.h /usr/include/mupdf/fitz/font.h \
+ /usr/include/mupdf/fitz/color.h /usr/include/mupdf/fitz/store.h \
+ /usr/include/mupdf/fitz/path.h /usr/include/mupdf/fitz/compress.h \
+ /usr/include/mupdf/fitz/pixmap.h /usr/include/mupdf/fitz/separation.h \
+ /usr/include/mupdf/fitz/compressed-buffer.h \
+ /usr/include/mupdf/fitz/filter.h /usr/include/mupdf/fitz/heap.h \
+ /usr/include/mupdf/fitz/heap-imp.h /usr/include/mupdf/fitz/image.h \
+ /usr/include/mupdf/fitz/bitmap.h /usr/include/mupdf/fitz/shade.h \
+ /usr/include/mupdf/fitz/glyph.h /usr/include/mupdf/fitz/device.h \
+ /usr/include/mupdf/fitz/display-list.h \
+ /usr/include/mupdf/fitz/structured-text.h \
+ /usr/include/mupdf/fitz/transition.h \
+ /usr/include/mupdf/fitz/glyph-cache.h /usr/include/mupdf/fitz/link.h \
+ /usr/include/mupdf/fitz/outline.h /usr/include/mupdf/fitz/document.h \
+ /usr/include/mupdf/fitz/util.h /usr/include/mupdf/fitz/writer.h \
+ /usr/include/mupdf/fitz/band-writer.h \
+ /usr/include/mupdf/fitz/write-pixmap.h \
+ /usr/include/mupdf/fitz/output-svg.h /usr/include/mupdf/fitz/story.h \
+ /usr/include/mupdf/fitz/story-writer.h /usr/include/mupdf/fitz/deskew.h \
+ /usr/include/mupdf/fitz/barcode.h /usr/include/qt6/QtWidgets/QWidget \
+ /usr/include/qt6/QtWidgets/qwidget.h \
+ /usr/include/qt6/QtWidgets/qtwidgetsglobal.h \
+ /usr/include/qt6/QtGui/qtguiglobal.h /usr/include/qt6/QtCore/qglobal.h \
+ /usr/include/c++/16/cstddef /usr/include/c++/16/utility \
+ /usr/include/c++/16/bits/stl_relops.h \
+ /usr/include/c++/16/initializer_list /usr/include/c++/16/cstdint \
  /usr/lib/gcc/x86_64-pc-linux-gnu/16/include/stdbool.h \
  /usr/include/qt6/QtCore/qtcoreglobal.h \
  /usr/include/qt6/QtCore/qtversionchecks.h \
@@ -45,49 +140,17 @@ CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o: \
  /usr/include/qt6/QtCore/qassert.h /usr/include/qt6/QtCore/qtnoop.h \
  /usr/include/qt6/QtCore/qtypes.h /usr/include/qt6/QtCore/qtversion.h \
  /usr/include/qt6/QtCore/qtypeinfo.h \
- /usr/include/qt6/QtCore/qcontainerfwd.h /usr/include/c++/16/limits \
+ /usr/include/qt6/QtCore/qcontainerfwd.h \
  /usr/include/qt6/QtCore/qsysinfo.h /usr/include/qt6/QtCore/qlogging.h \
  /usr/include/qt6/QtCore/qflags.h /usr/include/qt6/QtCore/qcompare_impl.h \
- /usr/include/c++/16/algorithm /usr/include/c++/16/bits/stl_algobase.h \
- /usr/include/c++/16/bits/cpp_type_traits.h \
- /usr/include/c++/16/ext/type_traits.h \
- /usr/include/c++/16/ext/numeric_traits.h \
- /usr/include/c++/16/bits/stl_iterator_base_types.h \
- /usr/include/c++/16/bits/stl_iterator_base_funcs.h \
- /usr/include/c++/16/bits/concept_check.h \
- /usr/include/c++/16/debug/assertions.h \
- /usr/include/c++/16/bits/stl_iterator.h \
- /usr/include/c++/16/bits/ptr_traits.h /usr/include/c++/16/debug/debug.h \
- /usr/include/c++/16/bits/predefined_ops.h \
- /usr/include/c++/16/bits/stl_function.h \
- /usr/include/c++/16/backward/binders.h /usr/include/c++/16/bit \
- /usr/include/c++/16/concepts /usr/include/c++/16/bits/stl_algo.h \
+ /usr/include/c++/16/algorithm /usr/include/c++/16/bits/stl_algo.h \
  /usr/include/c++/16/bits/algorithmfwd.h \
  /usr/include/c++/16/bits/stl_heap.h \
  /usr/include/c++/16/bits/uniform_int_dist.h \
  /usr/include/c++/16/bits/stl_tempbuf.h /usr/include/c++/16/new \
  /usr/include/c++/16/bits/exception.h \
  /usr/include/c++/16/bits/new_except.h \
- /usr/include/c++/16/bits/exception_defines.h \
- /usr/include/c++/16/bits/stl_construct.h /usr/include/c++/16/cstdlib \
- /usr/include/stdlib.h /usr/include/bits/waitflags.h \
- /usr/include/bits/waitstatus.h /usr/include/bits/floatn.h \
- /usr/include/bits/floatn-common.h /usr/include/bits/types/locale_t.h \
- /usr/include/bits/types/__locale_t.h /usr/include/sys/types.h \
- /usr/include/bits/types/clock_t.h /usr/include/bits/types/clockid_t.h \
- /usr/include/bits/types/time_t.h /usr/include/bits/types/timer_t.h \
- /usr/include/endian.h /usr/include/bits/endian.h \
- /usr/include/bits/endianness.h /usr/include/bits/byteswap.h \
- /usr/include/bits/uintn-identity.h /usr/include/sys/select.h \
- /usr/include/bits/select.h /usr/include/bits/types/sigset_t.h \
- /usr/include/bits/types/__sigset_t.h \
- /usr/include/bits/types/struct_timeval.h \
- /usr/include/bits/types/struct_timespec.h \
- /usr/include/bits/pthreadtypes.h /usr/include/bits/thread-shared-types.h \
- /usr/include/bits/pthreadtypes-arch.h \
- /usr/include/bits/atomic_wide_counter.h /usr/include/bits/struct_mutex.h \
- /usr/include/bits/struct_rwlock.h /usr/include/alloca.h \
- /usr/include/bits/stdlib-float.h /usr/include/c++/16/bits/std_abs.h \
+ /usr/include/c++/16/bits/stl_construct.h \
  /usr/include/c++/16/pstl/glue_algorithm_defs.h \
  /usr/include/c++/16/pstl/execution_defs.h \
  /usr/include/qt6/QtCore/qatomic.h /usr/include/qt6/QtCore/qbasicatomic.h \
@@ -115,35 +178,20 @@ CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o: \
  /usr/include/qt6/QtCore/qfunctionpointer.h \
  /usr/include/qt6/QtCore/qglobalstatic.h \
  /usr/include/qt6/QtCore/qmalloc.h /usr/include/qt6/QtCore/qminmax.h \
- /usr/include/qt6/QtCore/qnumeric.h /usr/include/c++/16/cmath \
- /usr/include/c++/16/bits/requires_hosted.h /usr/include/math.h \
- /usr/include/bits/math-vector.h /usr/include/bits/libm-simd-decl-stubs.h \
- /usr/include/bits/flt-eval-method.h /usr/include/bits/fp-logb.h \
- /usr/include/bits/fp-fast.h /usr/include/bits/mathcalls-macros.h \
- /usr/include/bits/mathcalls-helper-functions.h \
- /usr/include/bits/mathcalls.h /usr/include/bits/mathcalls-narrow.h \
- /usr/include/bits/iscanonical.h /usr/include/c++/16/bits/specfun.h \
- /usr/include/c++/16/bits/stdexcept_throw.h \
- /usr/include/c++/16/bits/stdexcept_throwfwd.h \
- /usr/include/c++/16/tr1/gamma.tcc \
- /usr/include/c++/16/tr1/special_function_util.h \
- /usr/include/c++/16/tr1/bessel_function.tcc \
- /usr/include/c++/16/tr1/beta_function.tcc \
- /usr/include/c++/16/tr1/ell_integral.tcc \
- /usr/include/c++/16/tr1/exp_integral.tcc \
- /usr/include/c++/16/tr1/hypergeometric.tcc \
- /usr/include/c++/16/tr1/legendre_function.tcc \
- /usr/include/c++/16/tr1/modified_bessel_func.tcc \
- /usr/include/c++/16/tr1/poly_hermite.tcc \
- /usr/include/c++/16/tr1/poly_laguerre.tcc \
- /usr/include/c++/16/tr1/riemann_zeta.tcc \
+ /usr/include/qt6/QtCore/qnumeric.h \
  /usr/include/qt6/QtCore/q20type_traits.h \
  /usr/include/qt6/QtCore/qoverload.h /usr/include/qt6/QtCore/qswap.h \
  /usr/include/qt6/QtCore/qtenvironmentvariables.h \
  /usr/include/qt6/QtCore/qtresource.h \
  /usr/include/qt6/QtCore/qttranslation.h \
  /usr/include/qt6/QtCore/qversiontagging.h \
- /usr/include/qt6/QtCore/qcompare.h \
+ /usr/include/qt6/QtGui/qtgui-config.h \
+ /usr/include/qt6/QtGui/qtguiexports.h \
+ /usr/include/qt6/QtWidgets/qtwidgets-config.h \
+ /usr/include/qt6/QtWidgets/qtwidgetsexports.h \
+ /usr/include/qt6/QtGui/qwindowdefs.h \
+ /usr/include/qt6/QtCore/qobjectdefs.h \
+ /usr/include/qt6/QtCore/qnamespace.h /usr/include/qt6/QtCore/qcompare.h \
  /usr/include/qt6/QtCore/qstdlibdetection.h \
  /usr/include/qt6/QtCore/qcomparehelpers.h /usr/include/c++/16/functional \
  /usr/include/c++/16/bits/refwrap.h \
@@ -177,10 +225,7 @@ CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o: \
  /usr/include/c++/16/bits/shared_ptr.h /usr/include/c++/16/iosfwd \
  /usr/include/c++/16/bits/stringfwd.h /usr/include/c++/16/bits/postypes.h \
  /usr/include/c++/16/cwchar /usr/include/wchar.h \
- /usr/lib/gcc/x86_64-pc-linux-gnu/16/include/stdarg.h \
  /usr/include/bits/types/wint_t.h /usr/include/bits/types/mbstate_t.h \
- /usr/include/bits/types/__mbstate_t.h /usr/include/bits/types/__FILE.h \
- /usr/include/bits/types/FILE.h \
  /usr/include/c++/16/bits/shared_ptr_base.h \
  /usr/include/c++/16/bits/allocated_ptr.h \
  /usr/include/c++/16/ext/atomicity.h \
@@ -196,19 +241,17 @@ CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o: \
  /usr/include/bits/types/struct_sched_param.h /usr/include/bits/cpu-set.h \
  /usr/include/time.h /usr/include/bits/time.h /usr/include/bits/timex.h \
  /usr/include/bits/types/struct_tm.h \
- /usr/include/bits/types/struct_itimerspec.h /usr/include/bits/setjmp.h \
- /usr/include/bits/types/struct___jmp_buf_tag.h \
+ /usr/include/bits/types/struct_itimerspec.h \
  /usr/include/bits/pthread_stack_min-dynamic.h \
  /usr/include/c++/16/x86_64-pc-linux-gnu/bits/atomic_word.h \
  /usr/include/sys/single_threaded.h /usr/include/c++/16/ext/concurrence.h \
  /usr/include/c++/16/bits/shared_ptr_atomic.h \
  /usr/include/c++/16/backward/auto_ptr.h \
  /usr/include/c++/16/pstl/glue_memory_defs.h \
- /usr/include/qt6/QtCore/qstring.h /usr/include/qt6/QtCore/qchar.h \
- /usr/include/qt6/QtCore/qstringview.h \
+ /usr/include/qt6/QtCore/qobject.h /usr/include/qt6/QtCore/qstring.h \
+ /usr/include/qt6/QtCore/qchar.h /usr/include/qt6/QtCore/qstringview.h \
  /usr/include/qt6/QtCore/qbytearray.h /usr/include/qt6/QtCore/qrefcount.h \
  /usr/include/qt6/QtCore/qarraydata.h /usr/include/qt6/QtCore/qpair.h \
- /usr/include/string.h /usr/include/strings.h \
  /usr/include/qt6/QtCore/qarraydatapointer.h \
  /usr/include/qt6/QtCore/qarraydataops.h \
  /usr/include/qt6/QtCore/qcontainertools_impl.h \
@@ -228,15 +271,11 @@ CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o: \
  /usr/include/c++/16/bits/basic_string.h /usr/include/c++/16/string_view \
  /usr/include/c++/16/bits/string_view.tcc \
  /usr/include/c++/16/ext/string_conversions.h /usr/include/c++/16/cstdio \
- /usr/include/stdio.h /usr/include/bits/types/__fpos_t.h \
- /usr/include/bits/types/__fpos64_t.h \
- /usr/include/bits/types/struct_FILE.h \
- /usr/include/bits/types/cookie_io_functions_t.h \
- /usr/include/bits/stdio_lim.h /usr/include/c++/16/cerrno \
- /usr/include/errno.h /usr/include/bits/errno.h \
- /usr/include/linux/errno.h /usr/include/asm/errno.h \
- /usr/include/asm-generic/errno.h /usr/include/asm-generic/errno-base.h \
- /usr/include/bits/types/error_t.h /usr/include/c++/16/bits/charconv.h \
+ /usr/include/c++/16/cerrno /usr/include/errno.h \
+ /usr/include/bits/errno.h /usr/include/linux/errno.h \
+ /usr/include/asm/errno.h /usr/include/asm-generic/errno.h \
+ /usr/include/asm-generic/errno-base.h /usr/include/bits/types/error_t.h \
+ /usr/include/c++/16/bits/charconv.h \
  /usr/include/c++/16/bits/basic_string.tcc \
  /usr/include/c++/16/bits/locale_classes.tcc \
  /usr/include/c++/16/system_error \
@@ -248,7 +287,7 @@ CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o: \
  /usr/include/qt6/QtCore/q20memory.h /usr/include/qt6/QtCore/q17memory.h \
  /usr/include/qt6/QtCore/qbytearrayalgorithms.h \
  /usr/include/qt6/QtCore/qbytearrayview.h \
- /usr/include/qt6/QtCore/qstringfwd.h /usr/include/c++/16/stdlib.h \
+ /usr/include/qt6/QtCore/qstringfwd.h \
  /usr/include/qt6/QtCore/qstringalgorithms.h \
  /usr/include/qt6/QtCore/qlatin1stringview.h \
  /usr/include/qt6/QtCore/qanystringview.h \
@@ -283,15 +322,7 @@ CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o: \
  /usr/include/qt6/QtCore/qobject_impl.h \
  /usr/include/qt6/QtCore/qbindingstorage.h /usr/include/c++/16/chrono \
  /usr/include/c++/16/bits/chrono.h /usr/include/c++/16/ratio \
- /usr/include/c++/16/ctime /usr/include/qt6/QtWidgets/QWidget \
- /usr/include/qt6/QtWidgets/qwidget.h \
- /usr/include/qt6/QtWidgets/qtwidgetsglobal.h \
- /usr/include/qt6/QtGui/qtguiglobal.h \
- /usr/include/qt6/QtGui/qtgui-config.h \
- /usr/include/qt6/QtGui/qtguiexports.h \
- /usr/include/qt6/QtWidgets/qtwidgets-config.h \
- /usr/include/qt6/QtWidgets/qtwidgetsexports.h \
- /usr/include/qt6/QtGui/qwindowdefs.h /usr/include/qt6/QtCore/qmargins.h \
+ /usr/include/c++/16/ctime /usr/include/qt6/QtCore/qmargins.h \
  /usr/include/qt6/QtCore/qcheckedint_impl.h \
  /usr/include/qt6/QtCore/q23utility.h \
  /usr/include/qt6/QtCore/q20utility.h /usr/include/qt6/QtGui/qaction.h \
@@ -329,53 +360,11 @@ CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o: \
  /usr/include/qt6/QtGui/qfontvariableaxis.h \
  /usr/include/qt6/QtWidgets/qsizepolicy.h \
  /usr/include/qt6/QtGui/qcursor.h /usr/include/qt6/QtGui/qbitmap.h \
- /usr/include/qt6/QtCore/QPointer /usr/include/qt6/QtCore/qpointer.h \
- /usr/include/qt6/QtGui/QKeySequence /usr/include/qt6/QtCore/QSet \
- /usr/include/qt6/QtCore/QVector /usr/include/qt6/QtCore/qvector.h \
- /usr/include/qt6/QtCore/QElapsedTimer \
- /usr/include/qt6/QtCore/qelapsedtimer.h \
- /usr/include/qt6/QtCore/qtmochelpers.h \
- /usr/include/qt6/QtCore/qtmocconstants.h \
- /usr/include/qt6/QtCore/q20algorithm.h \
- /home/pplupo/repos/plugins/wlx/officeview/build/officeview_autogen/UVLADIE3JM/moc_mupdfwidget.cpp \
- /home/pplupo/repos/plugins/wlx/officeview/build/officeview_autogen/UVLADIE3JM/../../../src/mupdfwidget.h \
- /usr/include/mupdf/fitz.h /usr/include/mupdf/fitz/version.h \
- /usr/include/mupdf/fitz/config.h /usr/include/mupdf/fitz/system.h \
- /usr/include/setjmp.h /usr/include/mupdf/fitz/export.h \
- /usr/include/mupdf/memento.h /usr/include/mupdf/fitz/track-usage.h \
- /usr/include/mupdf/fitz/context.h /usr/include/mupdf/fitz/geometry.h \
- /usr/include/c++/16/math.h /usr/include/mupdf/fitz/output.h \
- /usr/include/mupdf/fitz/buffer.h /usr/include/mupdf/fitz/string-util.h \
- /usr/include/mupdf/fitz/stream.h /usr/include/mupdf/fitz/log.h \
- /usr/include/mupdf/fitz/crypt.h /usr/include/mupdf/fitz/getopt.h \
- /usr/include/mupdf/fitz/hash.h /usr/include/mupdf/fitz/pool.h \
- /usr/include/mupdf/fitz/tree.h /usr/include/mupdf/fitz/bidi.h \
- /usr/include/mupdf/fitz/xml.h /usr/include/mupdf/fitz/archive.h \
- /usr/include/mupdf/fitz/json.h /usr/include/mupdf/fitz/hyphen.h \
- /usr/include/mupdf/fitz/types.h /usr/include/mupdf/fitz/text.h \
- /usr/include/mupdf/fitz/font.h /usr/include/mupdf/fitz/color.h \
- /usr/include/mupdf/fitz/store.h /usr/include/mupdf/fitz/path.h \
- /usr/include/mupdf/fitz/compress.h /usr/include/mupdf/fitz/pixmap.h \
- /usr/include/mupdf/fitz/separation.h \
- /usr/include/mupdf/fitz/compressed-buffer.h \
- /usr/include/mupdf/fitz/filter.h /usr/include/mupdf/fitz/heap.h \
- /usr/include/mupdf/fitz/heap-imp.h /usr/include/mupdf/fitz/image.h \
- /usr/include/mupdf/fitz/bitmap.h /usr/include/mupdf/fitz/shade.h \
- /usr/include/mupdf/fitz/glyph.h /usr/include/mupdf/fitz/device.h \
- /usr/include/mupdf/fitz/display-list.h \
- /usr/include/mupdf/fitz/structured-text.h \
- /usr/include/mupdf/fitz/transition.h \
- /usr/include/mupdf/fitz/glyph-cache.h /usr/include/mupdf/fitz/link.h \
- /usr/include/mupdf/fitz/outline.h /usr/include/mupdf/fitz/document.h \
- /usr/include/mupdf/fitz/util.h /usr/include/mupdf/fitz/writer.h \
- /usr/include/mupdf/fitz/band-writer.h \
- /usr/include/mupdf/fitz/write-pixmap.h \
- /usr/include/mupdf/fitz/output-svg.h /usr/include/mupdf/fitz/story.h \
- /usr/include/mupdf/fitz/story-writer.h /usr/include/mupdf/fitz/deskew.h \
- /usr/include/mupdf/fitz/barcode.h /usr/include/qt6/QtWidgets/QScrollArea \
+ /usr/include/qt6/QtWidgets/QScrollArea \
  /usr/include/qt6/QtWidgets/qscrollarea.h \
  /usr/include/qt6/QtWidgets/qabstractscrollarea.h \
  /usr/include/qt6/QtWidgets/qframe.h /usr/include/qt6/QtCore/QMap \
+ /usr/include/qt6/QtCore/QVector /usr/include/qt6/QtCore/qvector.h \
  /usr/include/qt6/QtCore/QStringList \
  /usr/include/qt6/QtCore/QTemporaryFile \
  /usr/include/qt6/QtCore/qtemporaryfile.h \
@@ -403,4 +392,45 @@ CMakeFiles/officeview.dir/officeview_autogen/mocs_compilation.cpp.o: \
  /usr/include/c++/16/bits/ostream.tcc \
  /usr/include/c++/16/bits/istream.tcc \
  /usr/include/c++/16/bits/sstream.tcc /usr/include/c++/16/codecvt \
- /usr/include/c++/16/bits/fs_dir.h /usr/include/c++/16/bits/fs_ops.h
+ /usr/include/c++/16/bits/fs_dir.h /usr/include/c++/16/bits/fs_ops.h \
+ /home/pplupo/repos/plugins/wlx/officeview/src/focus/FocusManager.h \
+ /usr/include/qt6/QtCore/QObject /usr/include/qt6/QtCore/QPointer \
+ /usr/include/qt6/QtCore/qpointer.h /usr/include/qt6/QtGui/QKeySequence \
+ /usr/include/qt6/QtCore/QSet /usr/include/qt6/QtCore/QElapsedTimer \
+ /usr/include/qt6/QtCore/qelapsedtimer.h /usr/include/qt6/QtGui/QPainter \
+ /usr/include/qt6/QtGui/qpainter.h /usr/include/qt6/QtGui/qtextoption.h \
+ /usr/include/qt6/QtGui/qpen.h /usr/include/qt6/QtGui/QMouseEvent \
+ /usr/include/qt6/QtGui/qevent.h /usr/include/qt6/QtCore/qcoreevent.h \
+ /usr/include/qt6/QtCore/qbasictimer.h \
+ /usr/include/qt6/QtCore/qabstracteventdispatcher.h \
+ /usr/include/qt6/QtCore/qeventloop.h \
+ /usr/include/qt6/QtCore/qdeadlinetimer.h /usr/include/qt6/QtCore/qurl.h \
+ /usr/include/qt6/QtGui/qeventpoint.h /usr/include/qt6/QtGui/qvector2d.h \
+ /usr/include/qt6/QtGui/qvectornd.h \
+ /usr/include/qt6/QtGui/qpointingdevice.h \
+ /usr/include/qt6/QtGui/qinputdevice.h /usr/include/qt6/QtGui/qscreen.h \
+ /usr/include/qt6/QtCore/QList /usr/include/qt6/QtCore/QObject \
+ /usr/include/qt6/QtCore/QRect /usr/include/qt6/QtCore/QSize \
+ /usr/include/qt6/QtCore/QSizeF /usr/include/qt6/QtGui/QTransform \
+ /usr/include/qt6/QtCore/qnativeinterface.h \
+ /usr/include/qt6/QtGui/qscreen_platform.h \
+ /usr/include/qt6/QtGui/qguiapplication.h \
+ /usr/include/qt6/QtCore/qcoreapplication.h \
+ /usr/include/qt6/QtCore/qcoreapplication_platform.h \
+ /usr/include/qt6/QtGui/qinputmethod.h /usr/include/qt6/QtCore/qlocale.h \
+ /usr/include/qt6/QtGui/qguiapplication_platform.h \
+ /usr/include/qt6/QtGui/QWheelEvent /usr/include/qt6/QtGui/QKeyEvent \
+ /usr/include/qt6/QtGui/QContextMenuEvent \
+ /usr/include/qt6/QtWidgets/QMenu /usr/include/qt6/QtWidgets/qmenu.h \
+ /usr/include/qt6/QtGui/QAction /usr/include/qt6/QtWidgets/QApplication \
+ /usr/include/qt6/QtWidgets/qapplication.h \
+ /usr/include/qt6/QtGui/QClipboard /usr/include/qt6/QtGui/qclipboard.h \
+ /usr/include/qt6/QtWidgets/QVBoxLayout \
+ /usr/include/qt6/QtWidgets/qboxlayout.h \
+ /usr/include/qt6/QtWidgets/qlayout.h \
+ /usr/include/qt6/QtWidgets/qlayoutitem.h \
+ /usr/include/qt6/QtWidgets/qgridlayout.h \
+ /usr/include/qt6/QtWidgets/QScrollBar \
+ /usr/include/qt6/QtWidgets/qscrollbar.h \
+ /usr/include/qt6/QtWidgets/qabstractslider.h \
+ /usr/include/qt6/QtWidgets/QTabBar /usr/include/qt6/QtWidgets/qtabbar.h
