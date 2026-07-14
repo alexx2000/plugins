@@ -20,6 +20,7 @@ include_directories(
 
 add_library(officeview SHARED
     src/officeview.cpp
+    src/focus/FocusManager.cpp
 )
 
 target_link_libraries(officeview

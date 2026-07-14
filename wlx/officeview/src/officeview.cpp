@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QWidget>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QPainter>
 #include <QImage>
 #include <QSettings>
@@ -9,37 +10,88 @@
 #include <QFileInfo>
 #include <QDebug>
 #include <QPaintEvent>
+#include <QKeyEvent>
+#include <QWheelEvent>
+#include <QContextMenuEvent>
+#include <QMenu>
+#include <QClipboard>
+#include <QPdfSelection>
 #include <QTemporaryFile>
+#include <QTemporaryDir>
 #include <QPdfDocument>
 #include <QPdfView>
+#include <QPdfPageNavigator>
 #include <QVBoxLayout>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QRegularExpression>
+#include <QSet>
+#include <QTextStream>
+#include <QMap>
+#include <QLabel>
+#include <QTabBar>
 #include <vector>
 
 #include "wlxplugin.h"
+#include "focus/FocusManager.h"
 
 #define LOK_USE_UNSTABLE_API
 #include <LibreOfficeKit/LibreOfficeKitEnums.h>
 #include <LibreOfficeKit/LibreOfficeKitInit.h>
 #include <LibreOfficeKit/LibreOfficeKit.h>
 
-#define _detectstring "EXT=\"ODT\" | EXT=\"DOC\" | EXT=\"DOCX\" | EXT=\"ODS\" | EXT=\"XLS\" | EXT=\"XLSX\" | EXT=\"ODP\" | EXT=\"PPT\" | EXT=\"PPTX\""
+#define _detectstring "EXT=\"ODT\" | EXT=\"DOC\" | EXT=\"DOCX\" | EXT=\"DOCM\" | EXT=\"ODS\" | EXT=\"XLS\" | EXT=\"XLSX\" | EXT=\"XLSM\" | EXT=\"ODP\" | EXT=\"PPT\" | EXT=\"PPTX\" | EXT=\"PPTM\""
+
+// Extensions the plugin will actually attempt to render: MS legacy binary,
+// OOXML (including macro-enabled, since those aren't templates), and ODF --
+// explicitly excluding template variants (dot/dotx/dotm/xlt/xltx/xltm/
+// pot/potx/potm/ott/ots/otp), which aren't in this list or _detectstring.
+// Ordered (not a QSet) so officeview.conf's [FileSizeLimits] section is
+// generated in a stable, readable order (legacy MS, OOXML, ODF).
+static const QStringList kSizeLimitedExtensionsOrdered = {
+    "doc", "docx", "docm", "xls", "xlsx", "xlsm", "ppt", "pptx", "pptm",
+    "odt", "ods", "odp"
+};
+static const qint64 kDefaultMaxFileSizeBytes = 3 * 1024 * 1024; // 3MB
 
 // --- Config Utilities ---
+//
+// officeview.conf layout (INI, QSettings::IniFormat):
+//   [Paths]           LibreOfficePath / EuroOfficePath / OnlyOfficePath
+//   [Engines]         EngineForOOXML / EngineForODF / EngineForLegacyMS
+//   [FileSizeLimits]  one entry per extension, see ensureConfigFileInitialized()
 
-QString getConfigValue(const QString& key, const QString& defaultValue = "") {
+QString getConfigValue(const QString& section, const QString& key, const QString& defaultValue = "") {
     QString configDir = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/doublecmd";
     QDir().mkpath(configDir);
     QSettings settings(configDir + "/officeview.conf", QSettings::IniFormat);
-    return settings.value("Settings/" + key, defaultValue).toString();
+    return settings.value(section + "/" + key, defaultValue).toString();
 }
 
-void setConfigValue(const QString& key, const QString& value) {
+void setConfigValue(const QString& section, const QString& key, const QString& value) {
     QString configDir = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/doublecmd";
     QSettings settings(configDir + "/officeview.conf", QSettings::IniFormat);
-    settings.setValue("Settings/" + key, value);
+    settings.setValue(section + "/" + key, value);
 }
+
+// Per-extension size limit, in bytes, above which the plugin declines to
+// process a file at all. All 12 extensions are pre-populated by
+// ensureConfigFileInitialized() (called once at plugin startup), so this
+// just reads -- it doesn't lazily create missing keys itself, unlike the
+// engine-preference lookups below.
+qint64 getMaxFileSizeBytes(const QString& extLower) {
+    QString value = getConfigValue("FileSizeLimits", extLower.toUpper(), "");
+    bool ok = false;
+    qint64 bytes = value.toLongLong(&ok);
+    // 0 is a valid, deliberate value (disables the extension entirely) --
+    // only fall back to the default when the value is missing or malformed.
+    return (ok && bytes >= 0) ? bytes : kDefaultMaxFileSizeBytes;
+}
+
+// ensureConfigFileInitialized() is defined after X2TWrapper/findLibreOfficePath
+// below, since it needs both for engine auto-detection; declared here so
+// ListLoad (defined even later) can call it without forward-declaration noise.
+void ensureConfigFileInitialized();
 
 // --- LibreOfficeKit Backend ---
 
@@ -56,90 +108,294 @@ struct PartInfo {
 };
 
 class LOKWidget : public QWidget {
+    Q_OBJECT
 public:
     LOKWidget(LibreOfficeKitDocument* doc, QTemporaryFile* sourceFile, QWidget* parent = nullptr) : QWidget(parent), pDoc(doc), m_sourceFile(sourceFile) {
+        setFocusPolicy(Qt::StrongFocus);
         if (pDoc) {
-            int docType = pDoc->pClass->getDocumentType(pDoc);
-            if (docType == LOK_DOCTYPE_PRESENTATION) {
-                pDoc->pClass->initializeForRendering(pDoc, "{}");
-            }
-            
-            int numParts = pDoc->pClass->getParts(pDoc);
-            if (numParts <= 0) numParts = 1;
-            
-            for (int i = 0; i < numParts; ++i) {
-                pDoc->pClass->setPart(pDoc, i);
-                long w = 0, h = 0;
-                pDoc->pClass->getDocumentSize(pDoc, &w, &h);
-                
-                PartInfo info;
-                info.index = i;
-                info.width_twips = w;
-                info.height_twips = h;
-                info.pixel_width = w / TWIPS_PER_PIXEL;
-                info.pixel_height = h / TWIPS_PER_PIXEL;
-                info.pixel_y_offset = m_totalHeight;
-                
-                m_totalHeight += info.pixel_height + 20; // 20px gap
-                if (info.pixel_width > m_maxWidth) m_maxWidth = info.pixel_width;
-                
-                m_parts.push_back(info);
-            }
-            setFixedSize(m_maxWidth, m_totalHeight);
-            
-            // Reset to 0 just in case
-            pDoc->pClass->setPart(pDoc, 0);
+            // Previously only called for presentations. LOK generally
+            // requires this before UNO commands (SelectAll, etc.) and
+            // text-selection queries work reliably, for any document type --
+            // likely the reason ODT/ODS copy was silently failing or copying
+            // stale/wrong-part data.
+            pDoc->pClass->initializeForRendering(pDoc, "{}");
+            recomputeLayout();
         }
     }
-    
+
     ~LOKWidget() {
         if (pDoc) pDoc->pClass->destroy(pDoc);
         if (m_sourceFile) delete m_sourceFile;
     }
 
+    int partCount() const { return (int)m_parts.size(); }
+
+    // Vertical pixel offset of a given part (sheet/slide), for the tab bar's
+    // click-to-scroll and the reverse scroll-to-active-tab mapping.
+    int partYOffset(int index) const {
+        if (index < 0 || index >= (int)m_parts.size()) return 0;
+        return m_parts[index].pixel_y_offset;
+    }
+
+    // Which part is currently the topmost visible one at a given scroll
+    // position -- used to keep the tab bar in sync while the user scrolls.
+    int partAtY(int y) const {
+        for (int i = (int)m_parts.size() - 1; i >= 0; --i) {
+            if (y >= m_parts[i].pixel_y_offset)
+                return i;
+        }
+        return 0;
+    }
+
+    // Select-all + copy via LOK's UNO command / text-selection API, scoped to
+    // one part (sheet/slide; ignored for text documents, which only have
+    // part 0). partIndex defaults to -1, meaning "whatever part LOK's
+    // internal state currently points to" -- callers that know which part
+    // the user actually means (a right-click position, or the part visible
+    // in the viewport) should always pass it explicitly. Without this,
+    // LOK's "current part" is left over from whatever paintEvent last called
+    // setPart() on -- the last part painted, not necessarily what the user
+    // clicked or is looking at, which was silently copying the wrong
+    // sheet's data (and often incomplete: SelectAll+getTextSelection
+    // against whatever cell/part LOK's cursor happened to be parked at).
+    void copyAllText(int partIndex = -1) {
+        if (!pDoc) {
+            printf("[OfficeView] copyAllText: no pDoc\n"); fflush(stdout);
+            return;
+        }
+        if (partIndex >= 0 && partIndex < (int)m_parts.size())
+            pDoc->pClass->setPart(pDoc, partIndex);
+        printf("[OfficeView] copyAllText: partIndex=%d currentPart=%d\n", partIndex, pDoc->pClass->getPart(pDoc));
+        fflush(stdout);
+        pDoc->pClass->postUnoCommand(pDoc, ".uno:SelectAll", nullptr, false);
+        // SelectAll's effect on LOK's internal document state isn't
+        // necessarily synchronous with this call returning. A single fixed
+        // 50ms processEvents() wait wasn't reliable -- live logging showed
+        // getTextSelection() still intermittently returning null even with
+        // it in place. Retry with a short pump-and-check loop instead of a
+        // single blind wait.
+        char* usedMimeType = nullptr;
+        char* text = nullptr;
+        for (int attempt = 0; attempt < 8 && !text; ++attempt) {
+            if (attempt > 0)
+                QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 25);
+            text = pDoc->pClass->getTextSelection(pDoc, "text/plain;charset=utf-8", &usedMimeType);
+            if (!text && usedMimeType) { free(usedMimeType); usedMimeType = nullptr; }
+        }
+        printf("[OfficeView] copyAllText: getTextSelection returned %d chars\n", text ? (int)strlen(text) : -1);
+        fflush(stdout);
+        if (text) {
+            QApplication::clipboard()->setText(QString::fromUtf8(text));
+            free(text);
+        }
+        if (usedMimeType) free(usedMimeType);
+        pDoc->pClass->postUnoCommand(pDoc, ".uno:Escape", nullptr, false);
+    }
+
+    void zoomIn() { m_zoomFactor = qMin(m_zoomFactor * 1.2, 8.0); recomputeLayout(); }
+    void zoomOut() { m_zoomFactor = qMax(m_zoomFactor / 1.2, 0.1); recomputeLayout(); }
+    void zoomReset() { m_zoomFactor = 1.0; recomputeLayout(); }
+
+signals:
+    void layoutChanged();
+
 protected:
+    void contextMenuEvent(QContextMenuEvent* event) override {
+        int clickedPart = partAtY(event->pos().y());
+        QMenu menu(this);
+        QAction* copyAction = menu.addAction(m_parts.size() > 1 ? "Copy this sheet's text" : "Copy all text");
+        connect(copyAction, &QAction::triggered, this, [this, clickedPart]() { copyAllText(clickedPart); });
+        menu.exec(event->globalPos());
+    }
+
     void paintEvent(QPaintEvent* event) override {
         if (!pDoc) return;
-        
+
         QRect rect = event->rect();
         QPainter painter(this);
         painter.fillRect(rect, Qt::lightGray);
-        
+        // Supersampling: ask LOK for more output pixels than the destination
+        // rect (nCanvasWidth/Height) covering the *same* twips range
+        // (nTileWidth/Height unchanged), then downscale with smooth
+        // interpolation. paintTile's canvas size and tile twips-range are
+        // independent parameters, so this doesn't change what content is
+        // rendered, just its internal detail before we shrink it back down.
+        // Attempt at the reported ODF font-aliasing issue -- LOK's own tile
+        // rasterizer (built for fast edit-view redraws, not print fidelity)
+        // is inherently lower quality than x2t's PDF rendering pipeline, so
+        // this narrows the gap but may not fully close it.
+        const int kSupersample = 2;
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+
         for (const auto& part : m_parts) {
             QRect partRect(0, part.pixel_y_offset, part.pixel_width, part.pixel_height);
             if (rect.intersects(partRect)) {
                 QRect intersect = rect.intersected(partRect);
-                
+
                 painter.fillRect(intersect, Qt::white);
-                
+
                 int localX = intersect.x();
                 int localY = intersect.y() - part.pixel_y_offset;
-                
-                int tilePosX = localX * TWIPS_PER_PIXEL;
-                int tilePosY = localY * TWIPS_PER_PIXEL;
-                int tileWidth = intersect.width() * TWIPS_PER_PIXEL;
-                int tileHeight = intersect.height() * TWIPS_PER_PIXEL;
-                
+
+                int tilePosX = localX * m_effectiveTwipsPerPixel;
+                int tilePosY = localY * m_effectiveTwipsPerPixel;
+                int tileWidth = intersect.width() * m_effectiveTwipsPerPixel;
+                int tileHeight = intersect.height() * m_effectiveTwipsPerPixel;
+
+                int canvasWidth = intersect.width() * kSupersample;
+                int canvasHeight = intersect.height() * kSupersample;
+
                 QByteArray buffer;
-                int stride = intersect.width() * 4;
-                buffer.resize(intersect.height() * stride);
+                int stride = canvasWidth * 4;
+                buffer.resize(canvasHeight * stride);
                 buffer.fill((char)255);
-                
+
                 pDoc->pClass->setPart(pDoc, part.index);
-                pDoc->pClass->paintTile(pDoc, (unsigned char*)buffer.data(), intersect.width(), intersect.height(), tilePosX, tilePosY, tileWidth, tileHeight);
-                
-                QImage image((const uchar*)buffer.constData(), intersect.width(), intersect.height(), stride, QImage::Format_ARGB32);
-                painter.drawImage(intersect.topLeft(), image);
+                pDoc->pClass->paintTile(pDoc, (unsigned char*)buffer.data(), canvasWidth, canvasHeight, tilePosX, tilePosY, tileWidth, tileHeight);
+
+                QImage image((const uchar*)buffer.constData(), canvasWidth, canvasHeight, stride, QImage::Format_ARGB32);
+                painter.drawImage(intersect, image);
             }
         }
     }
 
 private:
+    // Recomputes part pixel geometry for the current zoom factor. A higher
+    // zoom factor means more pixels per twip, i.e. a smaller effective
+    // twips-per-pixel ratio -- inverse of TWIPS_PER_PIXEL / m_zoomFactor.
+    void recomputeLayout() {
+        if (!pDoc) return;
+
+        m_effectiveTwipsPerPixel = qMax(1, (int)(TWIPS_PER_PIXEL / m_zoomFactor));
+
+        m_parts.clear();
+        m_totalHeight = 0;
+        m_maxWidth = 0;
+
+        int numParts = pDoc->pClass->getParts(pDoc);
+        if (numParts <= 0) numParts = 1;
+
+        for (int i = 0; i < numParts; ++i) {
+            pDoc->pClass->setPart(pDoc, i);
+            long w = 0, h = 0;
+            pDoc->pClass->getDocumentSize(pDoc, &w, &h);
+
+            PartInfo info;
+            info.index = i;
+            info.width_twips = w;
+            info.height_twips = h;
+            info.pixel_width = w / m_effectiveTwipsPerPixel;
+            info.pixel_height = h / m_effectiveTwipsPerPixel;
+            info.pixel_y_offset = m_totalHeight;
+
+            m_totalHeight += info.pixel_height + 20; // 20px gap
+            if (info.pixel_width > m_maxWidth) m_maxWidth = info.pixel_width;
+
+            m_parts.push_back(info);
+        }
+        setFixedSize(m_maxWidth, m_totalHeight);
+        pDoc->pClass->setPart(pDoc, 0);
+        update();
+        emit layoutChanged();
+    }
+
     LibreOfficeKitDocument* pDoc;
     QTemporaryFile* m_sourceFile;
     std::vector<PartInfo> m_parts;
     int m_totalHeight = 0;
     int m_maxWidth = 0;
+    double m_zoomFactor = 1.0;
+    int m_effectiveTwipsPerPixel = TWIPS_PER_PIXEL;
+};
+
+// Wraps the QScrollArea + LOKWidget pair with an optional sheet-tab bar
+// (ODS only -- LOK's getParts()/setPart() already gives per-sheet access,
+// same mechanism it uses for presentation slides) and FocusManager, mirroring
+// PdfViewerWidget's structure so both rendering paths have equivalent
+// features and a uniform interface for ListSendCommand.
+class LOKContainerWidget : public QWidget {
+    Q_OBJECT
+public:
+    // sheetNames: one entry per LOK "part", in order. Empty for non-ODS
+    // documents or when extraction fails -- no tab bar in that case.
+    LOKContainerWidget(QScrollArea* scrollArea, LOKWidget* lokWidget, const QStringList& sheetNames, QWidget* parent = nullptr)
+      : QWidget(parent), m_scrollArea(scrollArea), m_lokWidget(lokWidget) {
+        QVBoxLayout* layout = new QVBoxLayout(this);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(0);
+
+        if (sheetNames.size() > 1 && sheetNames.size() == lokWidget->partCount()) {
+            m_tabBar = new QTabBar(this);
+            m_tabBar->setExpanding(false);
+            for (const QString& name : sheetNames)
+                m_tabBar->addTab(name);
+            layout->addWidget(m_tabBar);
+            connect(m_tabBar, &QTabBar::currentChanged, this, [this](int index) {
+                if (index >= 0)
+                    m_scrollArea->verticalScrollBar()->setValue(m_lokWidget->partYOffset(index));
+            });
+            connect(m_scrollArea->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int value) {
+                int active = m_lokWidget->partAtY(value);
+                if (active != m_tabBar->currentIndex())
+                    m_tabBar->setCurrentIndex(active);
+            });
+            // Zoom changes part pixel offsets; re-sync the active tab.
+            connect(m_lokWidget, &LOKWidget::layoutChanged, this, [this]() {
+                int active = m_lokWidget->partAtY(m_scrollArea->verticalScrollBar()->value());
+                if (active != m_tabBar->currentIndex())
+                    m_tabBar->setCurrentIndex(active);
+            });
+        }
+
+        scrollArea->setParent(this);
+        layout->addWidget(scrollArea);
+
+        m_focusManager = new QtWlPlugin::FocusManager(this, lokWidget, this);
+        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Plus), QtWlPlugin::FocusManager::Always,
+            [lokWidget]() { lokWidget->zoomIn(); return true; });
+        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), QtWlPlugin::FocusManager::Always,
+            [lokWidget]() { lokWidget->zoomIn(); return true; });
+        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Minus), QtWlPlugin::FocusManager::Always,
+            [lokWidget]() { lokWidget->zoomOut(); return true; });
+        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), QtWlPlugin::FocusManager::Always,
+            [lokWidget]() { lokWidget->zoomReset(); return true; });
+        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_C), QtWlPlugin::FocusManager::Always,
+            [this]() { copyAllText(); return true; });
+
+        // Same viewport-wheel-consumption issue as QPdfView (see
+        // PdfViewerWidget's eventFilter comment) -- QScrollArea is also a
+        // QAbstractScrollArea, so intercept on its viewport directly.
+        scrollArea->viewport()->installEventFilter(this);
+    }
+
+    QtWlPlugin::FocusManager* focusManager() const { return m_focusManager; }
+
+    // No click position available here (keyboard shortcut / DC's lc_copy
+    // command), so use whichever part is currently visible at the top of
+    // the viewport -- same logic the tab-bar sync uses.
+    void copyAllText() {
+        int visiblePart = m_lokWidget->partAtY(m_scrollArea->verticalScrollBar()->value());
+        m_lokWidget->copyAllText(visiblePart);
+    }
+
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override {
+        if (obj == m_scrollArea->viewport() && event->type() == QEvent::Wheel) {
+            QWheelEvent* wheelEv = static_cast<QWheelEvent*>(event);
+            if (wheelEv->modifiers() & Qt::ControlModifier) {
+                if (wheelEv->angleDelta().y() > 0) m_lokWidget->zoomIn();
+                else if (wheelEv->angleDelta().y() < 0) m_lokWidget->zoomOut();
+                return true;
+            }
+        }
+        return QWidget::eventFilter(obj, event);
+    }
+
+private:
+    QScrollArea* m_scrollArea;
+    LOKWidget* m_lokWidget;
+    QTabBar* m_tabBar = nullptr;
+    QtWlPlugin::FocusManager* m_focusManager = nullptr;
 };
 
 QString findLibreOfficePath() {
@@ -149,12 +405,12 @@ QString findLibreOfficePath() {
         if (fi.exists() && fi.isDir()) return QString(envPath);
     }
     
-    QString confPath = getConfigValue("LibreOfficePath");
+    QString confPath = getConfigValue("Paths", "LibreOfficePath");
     if (!confPath.isEmpty()) {
         QFileInfo fi(confPath);
         if (fi.exists() && fi.isDir()) return confPath;
     }
-    
+
     QStringList fallbacks = {
         "/usr/lib/libreoffice/program",
         "/usr/lib64/libreoffice/program",
@@ -163,11 +419,137 @@ QString findLibreOfficePath() {
     for (const QString& fb : fallbacks) {
         QFileInfo fi(fb);
         if (fi.exists() && fi.isDir()) {
-            setConfigValue("LibreOfficePath", fb);
+            setConfigValue("Paths", "LibreOfficePath", fb);
             return fb;
         }
     }
     return QString();
+}
+
+// --- Spreadsheet sheet-name extraction (for the sheet-tab UI) ---
+// xlsx/ods are zip archives; shell out to `unzip -p` to pull the relevant
+// manifest XML and parse sheet names with a lightweight regex rather than
+// pulling in a full zip/XML dependency for this one lookup. Legacy .xls
+// (BIFF binary, not a zip) isn't supported here -- falls back to no tabs.
+//
+// Hidden sheets are excluded: x2t's printPages:"all" only exports visible
+// sheets to PDF, but this function was originally extracting every sheet
+// name regardless of visibility -- for any file with a hidden sheet, that
+// produced more names than actual PDF pages, silently failing
+// PdfViewerWidget's names.size()==pageCount() safety check and hiding the
+// tab bar entirely. Confirmed via a real 3-sheet (1 hidden) test file: 3
+// names extracted, 2 pages produced.
+// outRawIndices, when given, receives each visible sheet's 0-based position
+// within the FULL <sheets> list (including hidden ones) -- needed to patch
+// <workbookView activeTab="N"> correctly, since that attribute indexes into
+// the raw sheet list, not the visible-only subset returned in the names list.
+QStringList extractSpreadsheetSheetNames(const QString& filePath, const QString& ext, QVector<int>* outRawIndices = nullptr) {
+    QString innerXmlPath;
+    QRegularExpression tagRe, nameRe, hiddenRe;
+    if (ext == "xlsx" || ext == "xlsm") { // xlsm shares xlsx's internal zip/xml structure
+        innerXmlPath = "xl/workbook.xml";
+        tagRe = QRegularExpression("<sheet\\b[^>]*/?>");
+        nameRe = QRegularExpression("\\bname=\"([^\"]*)\"");
+        hiddenRe = QRegularExpression("\\bstate=\"(hidden|veryHidden)\"");
+    } else if (ext == "ods") {
+        innerXmlPath = "content.xml";
+        tagRe = QRegularExpression("<table:table\\b[^>]*>");
+        nameRe = QRegularExpression("\\btable:name=\"([^\"]*)\"");
+        hiddenRe = QRegularExpression("\\btable:visibility=\"hidden\"");
+    } else {
+        return {};
+    }
+
+    QProcess unzip;
+    unzip.start("unzip", QStringList() << "-p" << filePath << innerXmlPath);
+    if (!unzip.waitForFinished(5000) || unzip.exitCode() != 0) {
+        printf("[OfficeView] extractSpreadsheetSheetNames: unzip failed for %s (exit=%d, stderr=%s)\n",
+               filePath.toUtf8().constData(), unzip.exitCode(), unzip.readAllStandardError().constData());
+        fflush(stdout);
+        return {};
+    }
+
+    QString xml = QString::fromUtf8(unzip.readAllStandardOutput());
+    printf("[OfficeView] extractSpreadsheetSheetNames: unzip ok, xml length=%d bytes\n", xml.size());
+    fflush(stdout);
+    QStringList names;
+    if (outRawIndices) outRawIndices->clear();
+    int rawIndex = 0;
+    QRegularExpressionMatchIterator tagIt = tagRe.globalMatch(xml);
+    while (tagIt.hasNext()) {
+        QString tag = tagIt.next().captured(0);
+        int thisIndex = rawIndex++;
+        if (hiddenRe.match(tag).hasMatch())
+            continue;
+        QRegularExpressionMatch nameMatch = nameRe.match(tag);
+        if (!nameMatch.hasMatch())
+            continue;
+        QString name = nameMatch.captured(1);
+        name.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'");
+        names << name;
+        if (outRawIndices) outRawIndices->push_back(thisIndex);
+    }
+    return names;
+}
+
+// Creates a copy of an xlsx file with <workbookView activeTab="N"> set to
+// rawSheetIndex, so x2t's *default* (no printPages param) PDF export -- which
+// correctly paginates a sheet across as many pages as it needs, unlike
+// printPages:"all" which forces every sheet onto exactly one page -- targets
+// that specific sheet. Used to convert each sheet separately and merge the
+// results, rather than trying to get all sheets out of a single x2t call.
+bool patchXlsxActiveSheet(const QString& srcPath, const QString& dstPath, int rawSheetIndex) {
+    QTemporaryDir tempDir;
+    if (!tempDir.isValid())
+        return false;
+
+    QProcess unzip;
+    unzip.start("unzip", QStringList() << "-q" << "-o" << srcPath << "-d" << tempDir.path());
+    if (!unzip.waitForFinished(10000) || unzip.exitCode() != 0)
+        return false;
+
+    QString workbookPath = tempDir.filePath("xl/workbook.xml");
+    QFile workbookFile(workbookPath);
+    if (!workbookFile.open(QIODevice::ReadOnly))
+        return false;
+    QString xml = QString::fromUtf8(workbookFile.readAll());
+    workbookFile.close();
+
+    QString activeTabStr = QString("activeTab=\"%1\"").arg(rawSheetIndex);
+    QRegularExpression activeTabRe("activeTab=\"\\d+\"");
+    if (activeTabRe.match(xml).hasMatch()) {
+        xml.replace(activeTabRe, activeTabStr);
+    } else {
+        QRegularExpression viewTagRe("<workbookView\\b");
+        if (viewTagRe.match(xml).hasMatch()) {
+            xml.replace(viewTagRe, QString("<workbookView %1 ").arg(activeTabStr));
+        } else {
+            // No workbookView element at all -- inject a minimal one right
+            // after <bookViews> (creating that too if it's missing).
+            QRegularExpression bookViewsRe("<bookViews>");
+            QString injected = QString("<bookViews><workbookView %1 /></bookViews>").arg(activeTabStr);
+            if (bookViewsRe.match(xml).hasMatch())
+                xml.replace(bookViewsRe, injected.left(injected.indexOf("<workbookView")));
+            else
+                xml.replace("<sheets>", injected + "<sheets>");
+        }
+    }
+
+    if (!workbookFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return false;
+    workbookFile.write(xml.toUtf8());
+    workbookFile.close();
+
+    if (QFile::exists(dstPath))
+        QFile::remove(dstPath);
+
+    QProcess zip;
+    zip.setWorkingDirectory(tempDir.path());
+    zip.start("zip", QStringList() << "-q" << "-r" << dstPath << ".");
+    if (!zip.waitForFinished(10000) || zip.exitCode() != 0)
+        return false;
+
+    return QFile::exists(dstPath);
 }
 
 // --- X2T Backend (Euro-Office / OnlyOffice) ---
@@ -204,7 +586,7 @@ public:
     QString getFontsPath() {
         QString engineLower = loadedEngine.toLower();
         if (engineLower == "eurooffice") engineLower = "euro-office";
-        
+
         QString home = QDir::homePath();
         QStringList candidates = {
             home + "/.local/share/" + engineLower + "/desktopeditors/data/fonts/AllFonts.js",
@@ -217,16 +599,69 @@ public:
         return "";
     }
 
-    bool convertToPdf(const QString& inputPath, const QString& outputPath) {
+    // WORKAROUND for a packaging bug: the AllFonts.js/font_selection.bin shipped
+    // next to x2t in <install>/converter/ are baked at build time with paths
+    // from inside the Docker build container (e.g. /core-fonts/ASC.ttf), which
+    // don't exist on any installed system. x2t's PDF-embedding stage (PdfWriter's
+    // font manager) reads these bundled files directly and ignores the
+    // m_sAllFontsPath override used elsewhere, so images/shapes render but all
+    // text is silently dropped from the PDF. The user's own
+    // ~/.local/share/<engine>/desktopeditors/data/fonts/AllFonts.js (and its
+    // matching font_selection.bin) are regenerated correctly against the real
+    // install path, so copying them over the broken bundled copies fixes font
+    // embedding without touching core/x2t source. Runs once per process; safe
+    // to call before every conversion since it's a cheap no-op once synced.
+    bool fontCacheSynced = false;
+    void syncFontCacheWorkaround() {
+        if (fontCacheSynced || !isLoaded) return;
+        fontCacheSynced = true;
+
+        QString fontsJsSrc = getFontsPath();
+        if (fontsJsSrc.isEmpty()) return;
+        QString fontsDirSrc = QFileInfo(fontsJsSrc).absolutePath();
+        QString selectionBinSrc = fontsDirSrc + "/font_selection.bin";
+        if (!QFileInfo::exists(selectionBinSrc)) return;
+
+        QString converterDir = libPath + "/converter";
+        QString fontsJsDst = converterDir + "/AllFonts.js";
+        QString selectionBinDst = converterDir + "/font_selection.bin";
+
+        auto overwrite = [](const QString& src, const QString& dst) -> bool {
+            QFile dstFile(dst);
+            if (dstFile.exists() && !dstFile.remove()) {
+                printf("[OfficeView] font cache workaround: could not remove %s\n", dst.toUtf8().constData());
+                fflush(stdout);
+                return false;
+            }
+            if (!QFile::copy(src, dst)) {
+                printf("[OfficeView] font cache workaround: could not copy %s -> %s\n", src.toUtf8().constData(), dst.toUtf8().constData());
+                fflush(stdout);
+                return false;
+            }
+            return true;
+        };
+
+        bool ok = overwrite(fontsJsSrc, fontsJsDst) && overwrite(selectionBinSrc, selectionBinDst);
+        printf("[OfficeView] font cache workaround: %s\n", ok ? "synced correct AllFonts.js/font_selection.bin into converter/" : "failed, text may still be missing from generated PDFs");
+        fflush(stdout);
+    }
+
+    bool convertToPdf(const QString& inputPath, const QString& outputPath, bool allSheets = false) {
         if (!isLoaded) return false;
-        
+
+        syncFontCacheWorkaround();
+
         QTemporaryFile configXml;
         configXml.setFileTemplate(QDir::tempPath() + "/x2t_config_XXXXXX.xml");
         if (!configXml.open()) return false;
-        
+
         QString fontPath = getFontsPath();
         QString fontTag = fontPath.isEmpty() ? "" : QString("  <m_sAllFontsPath>%1</m_sAllFontsPath>\n").arg(fontPath);
-        
+        // Spreadsheets: x2t's PDF export defaults to the active sheet only.
+        // printPages:"all" makes it export every sheet as its own PDF page,
+        // which the sheet-tab UI then maps back to sheet names.
+        QString jsonParamsTag = allSheets ? "  <m_sJsonParams>{\"printPages\":\"all\"}</m_sJsonParams>\n" : "";
+
         QString xml = QString("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                               "<TaskQueueDataConvert xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n"
                               "  <m_sFileFrom>%1</m_sFileFrom>\n"
@@ -234,7 +669,8 @@ public:
                               "  <m_nFormatTo>513</m_nFormatTo>\n"
                               "  <m_bIsNoBase64>true</m_bIsNoBase64>\n"
                               "%3"
-                              "</TaskQueueDataConvert>").arg(inputPath, outputPath, fontTag);
+                              "%4"
+                              "</TaskQueueDataConvert>").arg(inputPath, outputPath, fontTag, jsonParamsTag);
                               
         configXml.write(xml.toUtf8());
         configXml.flush();
@@ -266,28 +702,335 @@ public:
         }
         return false;
     }
+
+    // Converts each of rawSheetIndices' sheets separately (via
+    // patchXlsxActiveSheet + the default, properly-paginating conversion
+    // mode -- not printPages:"all", which forces every sheet onto exactly
+    // one page) and merges the results with qpdf. outSheetStartPages[i] is
+    // the 0-based starting page of sheetNames[i]/rawSheetIndices[i] in the
+    // merged output, since a sheet may now span multiple pages.
+    //
+    // Returns false if qpdf isn't available or any step fails; callers
+    // should fall back to the single-call printPages:"all" behavior (or no
+    // tabs at all) in that case.
+    bool convertXlsxAllSheetsPaginated(const QString& inputPath, const QString& outputPath,
+                                        const QVector<int>& rawSheetIndices, QVector<int>& outSheetStartPages) {
+        outSheetStartPages.clear();
+        if (rawSheetIndices.isEmpty()) return false;
+
+        QString qpdfBin = QStandardPaths::findExecutable("qpdf");
+        if (qpdfBin.isEmpty()) {
+            printf("[OfficeView] convertXlsxAllSheetsPaginated: qpdf not found, falling back\n");
+            fflush(stdout);
+            return false;
+        }
+
+        QList<QTemporaryFile*> perSheetPdfs;
+        QStringList mergeArgs;
+        bool ok = true;
+        QString srcExt = QFileInfo(inputPath).suffix(); // xlsx or xlsm -- keep patched copies' format detectable
+
+        for (int rawIndex : rawSheetIndices) {
+            QTemporaryFile patchedXlsx;
+            patchedXlsx.setFileTemplate(QDir::tempPath() + "/officeview_sheet_XXXXXX." + srcExt);
+            if (!patchedXlsx.open()) { ok = false; break; }
+            QString patchedPath = patchedXlsx.fileName();
+            patchedXlsx.close();
+
+            if (!patchXlsxActiveSheet(inputPath, patchedPath, rawIndex)) {
+                printf("[OfficeView] convertXlsxAllSheetsPaginated: failed to patch activeTab=%d\n", rawIndex);
+                fflush(stdout);
+                ok = false;
+                break;
+            }
+
+            auto* sheetPdf = new QTemporaryFile();
+            sheetPdf->setFileTemplate(QDir::tempPath() + "/officeview_sheetpdf_XXXXXX.pdf");
+            if (!sheetPdf->open()) { delete sheetPdf; ok = false; break; }
+            QString sheetPdfPath = sheetPdf->fileName();
+            sheetPdf->close();
+
+            // No allSheets/printPages here -- this is exactly the default
+            // "convert the active sheet, paginate normally" mode confirmed
+            // to correctly span multiple pages.
+            if (!convertToPdf(patchedPath, sheetPdfPath, false)) {
+                printf("[OfficeView] convertXlsxAllSheetsPaginated: conversion failed for activeTab=%d\n", rawIndex);
+                fflush(stdout);
+                delete sheetPdf;
+                ok = false;
+                break;
+            }
+
+            perSheetPdfs.push_back(sheetPdf);
+            mergeArgs << sheetPdfPath;
+
+            QFile::remove(patchedPath);
+        }
+
+        // Start page of each sheet = running total of preceding sheets'
+        // actual page counts (not assumed to be 1 each).
+        if (ok) {
+            int running = 0;
+            for (QTemporaryFile* f : perSheetPdfs) {
+                outSheetStartPages.push_back(running);
+                QPdfDocument doc;
+                int pageCount = 1;
+                if (doc.load(f->fileName()) == QPdfDocument::Error::None)
+                    pageCount = qMax(1, doc.pageCount());
+                running += pageCount;
+            }
+        }
+
+        if (ok && !mergeArgs.isEmpty()) {
+            QProcess merge;
+            QStringList args;
+            args << "--empty" << "--pages" << mergeArgs << "--" << outputPath;
+            merge.start(qpdfBin, args);
+            if (!merge.waitForFinished(15000) || !QFileInfo::exists(outputPath) || QFileInfo(outputPath).size() == 0) {
+                printf("[OfficeView] convertXlsxAllSheetsPaginated: qpdf merge failed, exit=%d\n", merge.exitCode());
+                fflush(stdout);
+                ok = false;
+            }
+        }
+
+        for (QTemporaryFile* f : perSheetPdfs) delete f;
+        return ok;
+    }
 };
 
+// Creates officeview.conf with the full [Paths]/[Engines]/[FileSizeLimits]
+// layout (including the extensions the user hasn't opened yet -- previously
+// each MaxFileSizeBytes_<EXT> key only appeared after that extension's
+// first use, which is why the file never had all 12 entries) if it doesn't
+// already exist in this format. Preserves any values already present under
+// the old flat [Settings] layout, or from a previous run of this function,
+// rather than clobbering them. Engine/path values that are still unset fall
+// back to the same auto-detection ListLoad used to do inline.
+void ensureConfigFileInitialized() {
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/doublecmd";
+    QDir().mkpath(configDir);
+    QString confPath = configDir + "/officeview.conf";
+
+    QFile checkFile(confPath);
+    if (checkFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QString existing = QString::fromUtf8(checkFile.readAll());
+        checkFile.close();
+        if (existing.contains("[Paths]") && existing.contains("[FileSizeLimits]"))
+            return; // already in the current format
+    }
+
+    // Pull forward any values already set, whether from the old flat
+    // [Settings] layout or a fresh install with nothing yet.
+    QString loPath = getConfigValue("Settings", "LibreOfficePath", getConfigValue("Paths", "LibreOfficePath", ""));
+    QString euroPath = getConfigValue("Settings", "EuroOfficePath", getConfigValue("Paths", "EuroOfficePath", ""));
+    QString onlyPath = getConfigValue("Settings", "OnlyOfficePath", getConfigValue("Paths", "OnlyOfficePath", ""));
+    QString engineOOXML = getConfigValue("Settings", "EngineForOOXML", getConfigValue("Engines", "EngineForOOXML", ""));
+    QString engineODF = getConfigValue("Settings", "EngineForODF", getConfigValue("Engines", "EngineForODF", ""));
+    QString engineLegacyMS = getConfigValue("Settings", "EngineForLegacyMS", getConfigValue("Engines", "EngineForLegacyMS", ""));
+
+    QMap<QString, qint64> sizeLimits;
+    for (const QString& ext : kSizeLimitedExtensionsOrdered) {
+        QString extUpper = ext.toUpper();
+        QString v = getConfigValue("Settings", "MaxFileSizeBytes_" + extUpper,
+                                    getConfigValue("FileSizeLimits", extUpper, ""));
+        bool ok = false;
+        qint64 bytes = v.toLongLong(&ok);
+        sizeLimits[ext] = (ok && bytes >= 0) ? bytes : kDefaultMaxFileSizeBytes;
+    }
+
+    if (engineOOXML.isEmpty()) {
+        X2TWrapper checkEngines("EuroOffice");
+        if (checkEngines.isLoaded) {
+            engineOOXML = checkEngines.loadedEngine;
+            if (checkEngines.loadedEngine == "EuroOffice") euroPath = checkEngines.libPath;
+            else onlyPath = checkEngines.libPath;
+        } else {
+            engineOOXML = "LibreOffice";
+        }
+    }
+    if (engineODF.isEmpty()) engineODF = "LibreOffice";
+    if (engineLegacyMS.isEmpty()) engineLegacyMS = engineOOXML;
+    if (loPath.isEmpty()) loPath = findLibreOfficePath();
+
+    QFile f(confPath);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+        return;
+    QTextStream out(&f);
+
+    out << "[Paths]\n";
+    out << "LibreOfficePath=" << loPath << "\n";
+    out << "EuroOfficePath=" << euroPath << "\n";
+    out << "OnlyOfficePath=" << onlyPath << "\n";
+
+    out << "\n[Engines]\n";
+    out << "EngineForOOXML=" << engineOOXML << "\n";
+    out << "EngineForODF=" << engineODF << "\n";
+    out << "EngineForLegacyMS=" << engineLegacyMS << "\n";
+
+    out << "\n; Size limit in bytes. Files larger than this are not opened at\n";
+    out << "; all -- the plugin doesn't attempt to process them. Set a value\n";
+    out << "; to 0 to effectively disable the plugin for that extension.\n";
+    out << "[FileSizeLimits]\n";
+    for (const QString& ext : kSizeLimitedExtensionsOrdered)
+        out << ext.toUpper() << "=" << sizeLimits[ext] << "\n";
+
+    f.close();
+}
+
 class PdfViewerWidget : public QWidget {
+    Q_OBJECT
 public:
-    PdfViewerWidget(QPdfDocument* pdfDoc, QTemporaryFile* sourceFile, QTemporaryFile* tempPdf, QWidget* parent = nullptr) 
+    // sheetNames: one entry per sheet (not per page).
+    // sheetStartPages: parallel array, sheetStartPages[i] = 0-based starting
+    // page of sheetNames[i] in the PDF -- since a sheet may span multiple
+    // pages now (see X2TWrapper::convertXlsxAllSheetsPaginated), this is no
+    // longer assumed to equal the sheet's index. When empty but sheetNames
+    // isn't, falls back to the legacy 1-page-per-sheet assumption (used by
+    // the printPages:"all" fallback path, when qpdf isn't available for the
+    // proper per-sheet-paginated conversion).
+    PdfViewerWidget(QPdfDocument* pdfDoc, QTemporaryFile* sourceFile, QTemporaryFile* tempPdf,
+                    const QStringList& sheetNames = {}, const QVector<int>& sheetStartPages = {}, QWidget* parent = nullptr)
       : QWidget(parent), m_sourceFile(sourceFile), m_tempPdf(tempPdf) {
         QVBoxLayout* layout = new QVBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
-        
+        layout->setSpacing(0);
+
+        bool useExplicitStarts = !sheetStartPages.isEmpty() && sheetStartPages.size() == sheetNames.size();
+        bool useLegacyOneToOne = sheetStartPages.isEmpty() && sheetNames.size() == pdfDoc->pageCount();
+
+        if (sheetNames.size() > 1 && (useExplicitStarts || useLegacyOneToOne)) {
+            if (useExplicitStarts) m_sheetStartPages = sheetStartPages;
+            else { for (int i = 0; i < sheetNames.size(); ++i) m_sheetStartPages.push_back(i); }
+
+            m_tabBar = new QTabBar(this);
+            m_tabBar->setExpanding(false);
+            for (const QString& name : sheetNames)
+                m_tabBar->addTab(name);
+            layout->addWidget(m_tabBar);
+            connect(m_tabBar, &QTabBar::currentChanged, this, [this](int index) {
+                if (index >= 0 && index < m_sheetStartPages.size() && m_pdfView->pageNavigator())
+                    m_pdfView->pageNavigator()->jump(m_sheetStartPages[index], QPointF());
+            });
+        }
+
         pdfDoc->setParent(this);
-        QPdfView* pdfView = new QPdfView(this);
-        pdfView->setDocument(pdfDoc);
-        pdfView->setPageMode(QPdfView::PageMode::MultiPage);
-        layout->addWidget(pdfView);
+        m_pdfView = new QPdfView(this);
+        m_pdfView->setDocument(pdfDoc);
+        // Always MultiPage (continuous scroll), even with a tab bar. A sheet
+        // can legitimately span more than one page now (see
+        // X2TWrapper::convertXlsxAllSheetsPaginated); SinglePage mode shows
+        // exactly one page and needs an explicit page-forward action to
+        // advance, so a multi-page sheet's later pages were effectively
+        // hidden behind the tab bar with no obvious way to reach them.
+        // MultiPage's normal scrolling reveals them the same way it reveals
+        // the next sheet when you keep scrolling past the current one.
+        m_pdfView->setPageMode(QPdfView::PageMode::MultiPage);
+        m_pdfView->setZoomMode(QPdfView::ZoomMode::FitToWidth);
+        layout->addWidget(m_pdfView);
+
+        if (m_tabBar) {
+            connect(m_pdfView->pageNavigator(), &QPdfPageNavigator::currentPageChanged, this, [this](int page) {
+                // Largest sheet index whose start page is <= the current page.
+                int active = 0;
+                for (int i = 0; i < m_sheetStartPages.size(); ++i) {
+                    if (page >= m_sheetStartPages[i]) active = i;
+                    else break;
+                }
+                if (active != m_tabBar->currentIndex())
+                    m_tabBar->setCurrentIndex(active);
+            });
+        }
+
+        m_focusManager = new QtWlPlugin::FocusManager(this, m_pdfView, this);
+        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Plus), QtWlPlugin::FocusManager::Always,
+            [this]() { zoomIn(); return true; });
+        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), QtWlPlugin::FocusManager::Always,
+            [this]() { zoomIn(); return true; });
+        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Minus), QtWlPlugin::FocusManager::Always,
+            [this]() { zoomOut(); return true; });
+        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), QtWlPlugin::FocusManager::Always,
+            [this]() { zoomReset(); return true; });
+        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_C), QtWlPlugin::FocusManager::Always,
+            [this]() { copyCurrentPageText(); return true; });
+
+        // QPdfView is a QAbstractScrollArea with no wheelEvent override of its
+        // own; its base implementation consumes Ctrl+wheel for scrolling
+        // whenever there's room left to scroll in that direction, so a
+        // wheelEvent() override on this outer widget only fires once the
+        // scroll area is already at its limit -- which on a freshly-opened,
+        // top-scrolled document is only true for the "scroll up"/zoom-in
+        // direction (confirmed: this exact asymmetry was the reported bug --
+        // zoom in via Ctrl+wheel worked, zoom out did not). Installing the
+        // filter directly on the viewport intercepts before the scroll area
+        // gets a chance to consume it, for both directions consistently.
+        m_pdfView->viewport()->installEventFilter(this);
     }
-    
+
     ~PdfViewerWidget() {
         if (m_sourceFile) delete m_sourceFile;
         if (m_tempPdf) delete m_tempPdf;
     }
-    
+
+    void zoomIn() {
+        m_pdfView->setZoomMode(QPdfView::ZoomMode::Custom);
+        m_pdfView->setZoomFactor(qMin(m_pdfView->zoomFactor() * 1.2, 8.0));
+    }
+    void zoomOut() {
+        m_pdfView->setZoomMode(QPdfView::ZoomMode::Custom);
+        m_pdfView->setZoomFactor(qMax(m_pdfView->zoomFactor() / 1.2, 0.1));
+    }
+    void zoomReset() {
+        m_pdfView->setZoomMode(QPdfView::ZoomMode::FitToWidth);
+    }
+
+    // Copies the currently-visible page's full text to the clipboard.
+    //
+    // NOTE on scope: QPdfView's page-layout/coordinate-mapping internals are
+    // private (Q_DECLARE_PRIVATE, no public API to map a viewport click to a
+    // page + point-within-page), so true click-and-drag partial-text
+    // selection with visual highlighting isn't buildable on top of it without
+    // either fragile reverse-engineering of its private layout math, or
+    // replacing QPdfView with a custom-built page renderer for full control
+    // over that math. This whole-page-copy is the reliable subset achievable
+    // with the public API.
+    void copyCurrentPageText() {
+        QPdfDocument* doc = m_pdfView->document();
+        if (!doc) return;
+        int page = m_pdfView->pageNavigator() ? m_pdfView->pageNavigator()->currentPage() : 0;
+        if (page < 0) page = 0;
+        QPdfSelection sel = doc->getAllText(page);
+        QString text = sel.text();
+        if (!text.isEmpty())
+            QApplication::clipboard()->setText(text);
+    }
+
+    QtWlPlugin::FocusManager* focusManager() const { return m_focusManager; }
+
+protected:
+    void contextMenuEvent(QContextMenuEvent* event) override {
+        QMenu menu(this);
+        QAction* copyAction = menu.addAction("Copy page text");
+        connect(copyAction, &QAction::triggered, this, &PdfViewerWidget::copyCurrentPageText);
+        menu.exec(event->globalPos());
+    }
+
+    bool eventFilter(QObject* obj, QEvent* event) override {
+        if (obj == m_pdfView->viewport() && event->type() == QEvent::Wheel) {
+            QWheelEvent* wheelEv = static_cast<QWheelEvent*>(event);
+            if (wheelEv->modifiers() & Qt::ControlModifier) {
+                if (wheelEv->angleDelta().y() > 0) zoomIn();
+                else if (wheelEv->angleDelta().y() < 0) zoomOut();
+                return true; // consumed -- don't let the scroll area also scroll
+            }
+        }
+        return QWidget::eventFilter(obj, event);
+    }
+
 private:
+    QPdfView* m_pdfView = nullptr;
+    QTabBar* m_tabBar = nullptr;
+    QVector<int> m_sheetStartPages;
+    QtWlPlugin::FocusManager* m_focusManager = nullptr;
     QTemporaryFile* m_sourceFile;
     QTemporaryFile* m_tempPdf;
 };
@@ -305,32 +1048,55 @@ extern "C" {
     HWND DCPCALL ListLoad(HWND ParentWin, char* FileToLoad, int ShowFlags) {
         QString filePath = QString::fromUtf8(FileToLoad);
         QString ext = QFileInfo(filePath).suffix().toLower();
-        
-        // Populate missing config options with defaults automatically
-        QString enginePrefOOXML = getConfigValue("EngineForOOXML", "");
-        if (enginePrefOOXML.isEmpty()) {
-            X2TWrapper checkEngines("EuroOffice");
-            if (checkEngines.isLoaded) {
-                enginePrefOOXML = checkEngines.loadedEngine;
-                setConfigValue(checkEngines.loadedEngine + "Path", checkEngines.libPath);
-            } else {
-                enginePrefOOXML = "LibreOffice";
+
+        // Creates/migrates officeview.conf's [Paths]/[Engines]/[FileSizeLimits]
+        // sections (all 12 extensions pre-populated) on first call; a no-op
+        // once the file is already in that format.
+        ensureConfigFileInitialized();
+
+        // Per-extension size limit -- checked before any temp copy or
+        // conversion work, so an oversized file costs nothing beyond a
+        // stat() call. Config-driven ([FileSizeLimits] section, see
+        // getMaxFileSizeBytes), 3MB default, applies to every extension the
+        // plugin handles except templates (dot/dotx/xlt/xltx/pot/potx/ott/
+        // ots/otp -- none of which are in kSizeLimitedExtensionsOrdered or
+        // _detectstring to begin with).
+        if (kSizeLimitedExtensionsOrdered.contains(ext)) {
+            qint64 fileSize = QFileInfo(filePath).size();
+            qint64 limit = getMaxFileSizeBytes(ext);
+            if (fileSize > limit) {
+                printf("[OfficeView] %s (%lld bytes) exceeds the %lld byte limit for .%s, skipping\n",
+                       filePath.toUtf8().constData(), (long long)fileSize, (long long)limit, ext.toUtf8().constData());
+                fflush(stdout);
+                QLabel* label = new QLabel(
+                    QString("File too large to preview (%1 MB, limit %2 MB for .%3 files).\nAdjust [FileSizeLimits] %4 in officeview.conf to change this.")
+                        .arg(fileSize / 1048576.0, 0, 'f', 1)
+                        .arg(limit / 1048576.0, 0, 'f', 1)
+                        .arg(ext)
+                        .arg(ext.toUpper()),
+                    (QWidget*)ParentWin);
+                label->setAlignment(Qt::AlignCenter);
+                label->setWordWrap(true);
+                label->show();
+                return (HWND)label;
             }
-            setConfigValue("EngineForOOXML", enginePrefOOXML);
-        }
-        
-        QString enginePrefODF = getConfigValue("EngineForODF", "");
-        if (enginePrefODF.isEmpty()) {
-            enginePrefODF = "LibreOffice";
-            setConfigValue("EngineForODF", enginePrefODF);
         }
 
-        QString enginePrefLegacyMS = getConfigValue("EngineForLegacyMS", "");
-        if (enginePrefLegacyMS.isEmpty()) {
-            enginePrefLegacyMS = enginePrefOOXML; // Default to whatever OOXML defaults to (EuroOffice if available)
-            setConfigValue("EngineForLegacyMS", enginePrefLegacyMS);
-        }
-        
+        // ensureConfigFileInitialized() already populated these; the empty
+        // fallbacks here are just defensive (e.g. if the user hand-edited
+        // the file and blanked a value out).
+        //
+        // ODF always defaults to LibreOffice -- its ODF rendering fidelity is
+        // meaningfully better than x2t's, and this is a deliberate format-family
+        // split (LibreOffice for ODF, EuroOffice/OnlyOffice for OOXML), not an
+        // oversight. The LOKWidget path has its own focus management, copy, and
+        // context menu (see FocusManager wiring below and LOKWidget::copyAllText)
+        // so it doesn't need to borrow PdfViewerWidget's features via x2t.
+        QString enginePrefOOXML = getConfigValue("Engines", "EngineForOOXML", "EuroOffice");
+        QString enginePrefODF = getConfigValue("Engines", "EngineForODF", "LibreOffice");
+        QString enginePrefLegacyMS = getConfigValue("Engines", "EngineForLegacyMS", enginePrefOOXML);
+
+
         // Copy to temp file to prevent doublecmd .lock file focus stealing loop
         QTemporaryFile* tempSource = new QTemporaryFile();
         tempSource->setFileTemplate(QDir::tempPath() + "/officeview_src_XXXXXX." + ext);
@@ -346,34 +1112,69 @@ extern "C" {
         }
         tempSource->close(); // Close so external engines can read it
         
-        bool isOOXML = (ext == "docx" || ext == "xlsx" || ext == "pptx");
+        bool isOOXML = (ext == "docx" || ext == "xlsx" || ext == "pptx" || ext == "docm" || ext == "xlsm" || ext == "pptm");
         bool isODF = (ext == "odt" || ext == "ods" || ext == "odp");
         bool isLegacyMS = (ext == "doc" || ext == "xls" || ext == "ppt");
-        
+        bool isSpreadsheet = (ext == "xlsx" || ext == "xlsm" || ext == "ods"); // legacy .xls (BIFF) unsupported for tabs
+
         QString selectedEngine = "LibreOffice";
         if (isOOXML) selectedEngine = enginePrefOOXML;
         else if (isODF) selectedEngine = enginePrefODF;
         else if (isLegacyMS) selectedEngine = enginePrefLegacyMS;
-        
+
+        // Computed once up front so both the x2t/PdfViewerWidget path and the
+        // LibreOfficeKit/LOKContainerWidget path can use it for their tab bars.
+        QStringList sheetNames;
+        QVector<int> sheetRawIndices; // xlsx only, for activeTab patching
+        if (isSpreadsheet)
+            sheetNames = extractSpreadsheetSheetNames(tempSource->fileName(), ext, (ext == "xlsx" || ext == "xlsm") ? &sheetRawIndices : nullptr);
+        printf("[OfficeView] sheet extraction: ext=%s isSpreadsheet=%d tempSource=%s sheetNames=%d sheetRawIndices=%d names=[%s]\n",
+               ext.toUtf8().constData(), isSpreadsheet, tempSource->fileName().toUtf8().constData(),
+               sheetNames.size(), sheetRawIndices.size(), sheetNames.join(",").toUtf8().constData());
+        fflush(stdout);
+
         // Attempt x2t engines
         if (selectedEngine == "EuroOffice" || selectedEngine == "OnlyOffice" || selectedEngine == "Auto") {
             X2TWrapper wrapper(selectedEngine);
             if (wrapper.isLoaded) {
                 printf("[OfficeView] Attempting to render %s with %s (x2t)...\n", filePath.toUtf8().constData(), wrapper.loadedEngine.toUtf8().constData());
                 fflush(stdout);
-                
+
                 QTemporaryFile* tempPdf = new QTemporaryFile();
                 tempPdf->setFileTemplate(QDir::tempPath() + "/officeview_XXXXXX.pdf");
                 if (tempPdf->open()) {
                     QString outPath = tempPdf->fileName();
                     tempPdf->close();
-                    
-                    if (wrapper.convertToPdf(tempSource->fileName(), outPath)) {
+
+                    QVector<int> sheetStartPages;
+                    bool converted = false;
+
+                    // Proper multi-page-per-sheet pagination: convert each
+                    // sheet separately and merge. Only for xlsx (activeTab
+                    // patching is xlsx-specific) with more than one visible
+                    // sheet -- a single sheet needs no merging at all.
+                    if ((ext == "xlsx" || ext == "xlsm") && sheetRawIndices.size() > 1) {
+                        converted = wrapper.convertXlsxAllSheetsPaginated(tempSource->fileName(), outPath, sheetRawIndices, sheetStartPages);
+                        if (!converted) {
+                            printf("[OfficeView] Per-sheet paginated conversion unavailable/failed, falling back to printPages:all (sheets may be squeezed onto one page each)\n");
+                            fflush(stdout);
+                        }
+                    }
+
+                    if (!converted)
+                        converted = wrapper.convertToPdf(tempSource->fileName(), outPath, !sheetNames.isEmpty());
+                    if (converted) {
                         QPdfDocument* pdfDoc = new QPdfDocument();
                         if (pdfDoc->load(outPath) == QPdfDocument::Error::None) {
                             printf("[OfficeView] Successfully rendered %s with %s (x2t)\n", filePath.toUtf8().constData(), wrapper.loadedEngine.toUtf8().constData());
                             fflush(stdout);
-                            PdfViewerWidget* pdfWidget = new PdfViewerWidget(pdfDoc, tempSource, tempPdf, (QWidget*)ParentWin);
+                            // pageCount() mismatch on the legacy fallback path
+                            // (e.g. a sheet spanning multiple pages under
+                            // printPages:"all") means the 1-sheet-per-page
+                            // assumption doesn't hold; PdfViewerWidget
+                            // silently skips the tab bar in that case rather
+                            // than showing a wrong mapping.
+                            PdfViewerWidget* pdfWidget = new PdfViewerWidget(pdfDoc, tempSource, tempPdf, sheetNames, sheetStartPages, (QWidget*)ParentWin);
                             pdfWidget->show();
                             return (HWND)pdfWidget;
                         }
@@ -381,7 +1182,7 @@ extern "C" {
                     }
                 }
                 delete tempPdf;
-                
+
                 // Fallback to LO if x2t conversion failed
                 printf("[OfficeView] Falling back to LibreOfficeKit for %s\n", filePath.toUtf8().constData());
                 fflush(stdout);
@@ -410,12 +1211,15 @@ extern "C" {
             if (pOffice) {
                 LibreOfficeKitDocument* pDoc = pOffice->pClass->documentLoad(pOffice, tempSource->fileName().toUtf8().constData());
                 if (pDoc) {
-                    QScrollArea* scrollArea = new QScrollArea((QWidget*)ParentWin);
-                    LOKWidget* widget = new LOKWidget(pDoc, tempSource, scrollArea);
-                    scrollArea->setWidget(widget);
+                    // scrollArea has no parent yet -- LOKContainerWidget's
+                    // constructor reparents it into its own layout.
+                    QScrollArea* scrollArea = new QScrollArea();
+                    LOKWidget* lokWidget = new LOKWidget(pDoc, tempSource, scrollArea);
+                    scrollArea->setWidget(lokWidget);
                     scrollArea->setWidgetResizable(false);
-                    scrollArea->show();
-                    return (HWND)scrollArea;
+                    LOKContainerWidget* container = new LOKContainerWidget(scrollArea, lokWidget, sheetNames, (QWidget*)ParentWin);
+                    container->show();
+                    return (HWND)container;
                 }
             }
         }
@@ -438,6 +1242,45 @@ extern "C" {
     }
 
     int DCPCALL ListSendCommand(HWND ListWin, int Command, int Parameter) {
-        return LISTPLUGIN_ERROR;
+        QWidget* widget = (QWidget*)ListWin;
+        if (!widget) return LISTPLUGIN_ERROR;
+
+        switch (Command) {
+            case lc_focus:
+                // DC uses lc_focus to hand focus to/reclaim focus from the plugin.
+                // Parameter: 1 = focus gained, 0 = focus lost. Both rendering
+                // paths (x2t/PdfViewerWidget and LibreOfficeKit/LOKContainerWidget)
+                // use QtWlPlugin::FocusManager, which also self-manages focus
+                // via a QApplication-level event filter -- confirmed via live
+                // logging that DC sends an explicit lc_focus(0) immediately
+                // after a click that FocusManager had already correctly
+                // activated internally, undoing it before the next keypress
+                // arrived (the actual cause of a "must click twice" symptom).
+                // setActiveFromHost() ignores deactivation requests that
+                // arrive within a short grace period of such an activation.
+                if (PdfViewerWidget* pdfWidget = qobject_cast<PdfViewerWidget*>(widget)) {
+                    pdfWidget->focusManager()->setActiveFromHost(Parameter != 0);
+                } else if (LOKContainerWidget* lokContainer = qobject_cast<LOKContainerWidget*>(widget)) {
+                    lokContainer->focusManager()->setActiveFromHost(Parameter != 0);
+                }
+                return LISTPLUGIN_OK;
+            case lc_copy:
+                if (PdfViewerWidget* pdfWidget = qobject_cast<PdfViewerWidget*>(widget)) {
+                    pdfWidget->copyCurrentPageText();
+                    return LISTPLUGIN_OK;
+                } else if (LOKContainerWidget* lokContainer = qobject_cast<LOKContainerWidget*>(widget)) {
+                    lokContainer->copyAllText();
+                    return LISTPLUGIN_OK;
+                }
+                return LISTPLUGIN_ERROR;
+            case lc_newparams:
+                // Accept and ignore to avoid DC destroying/recreating the plugin
+                // on unrelated file-change notifications.
+                return LISTPLUGIN_OK;
+            default:
+                return LISTPLUGIN_ERROR;
+        }
     }
 }
+
+#include "officeview.moc"
