@@ -15,12 +15,8 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QClipboard>
-#include <QPdfSelection>
 #include <QTemporaryFile>
 #include <QTemporaryDir>
-#include <QPdfDocument>
-#include <QPdfView>
-#include <QPdfPageNavigator>
 #include <QVBoxLayout>
 #include <QProcess>
 #include <QProcessEnvironment>
@@ -34,6 +30,7 @@
 
 #include "wlxplugin.h"
 #include "focus/FocusManager.h"
+#include "mupdfwidget.h"
 
 #define LOK_USE_UNSTABLE_API
 #include <LibreOfficeKit/LibreOfficeKitEnums.h>
@@ -443,6 +440,26 @@ QString findLibreOfficePath() {
 // within the FULL <sheets> list (including hidden ones) -- needed to patch
 // <workbookView activeTab="N"> correctly, since that attribute indexes into
 // the raw sheet list, not the visible-only subset returned in the names list.
+// Lightweight page-count-only helper for the qpdf merge's per-sheet
+// bookkeeping (see X2TWrapper::convertXlsxAllSheetsPaginated) -- opens and
+// immediately drops the document, no rendering.
+int muPdfPageCount(const QString& path) {
+    fz_context* ctx = fz_new_context(NULL, NULL, FZ_STORE_UNLIMITED);
+    if (!ctx) return 1;
+    fz_register_document_handlers(ctx);
+    int count = 1;
+    fz_try(ctx) {
+        fz_document* doc = fz_open_document(ctx, path.toUtf8().constData());
+        count = qMax(1, fz_count_pages(ctx, doc));
+        fz_drop_document(ctx, doc);
+    }
+    fz_catch(ctx) {
+        count = 1;
+    }
+    fz_drop_context(ctx);
+    return count;
+}
+
 QStringList extractSpreadsheetSheetNames(const QString& filePath, const QString& ext, QVector<int>* outRawIndices = nullptr) {
     QString innerXmlPath;
     QRegularExpression tagRe, nameRe, hiddenRe;
@@ -773,11 +790,7 @@ public:
             int running = 0;
             for (QTemporaryFile* f : perSheetPdfs) {
                 outSheetStartPages.push_back(running);
-                QPdfDocument doc;
-                int pageCount = 1;
-                if (doc.load(f->fileName()) == QPdfDocument::Error::None)
-                    pageCount = qMax(1, doc.pageCount());
-                running += pageCount;
+                running += muPdfPageCount(f->fileName());
             }
         }
 
@@ -877,163 +890,6 @@ void ensureConfigFileInitialized() {
     f.close();
 }
 
-class PdfViewerWidget : public QWidget {
-    Q_OBJECT
-public:
-    // sheetNames: one entry per sheet (not per page).
-    // sheetStartPages: parallel array, sheetStartPages[i] = 0-based starting
-    // page of sheetNames[i] in the PDF -- since a sheet may span multiple
-    // pages now (see X2TWrapper::convertXlsxAllSheetsPaginated), this is no
-    // longer assumed to equal the sheet's index. When empty but sheetNames
-    // isn't, falls back to the legacy 1-page-per-sheet assumption (used by
-    // the printPages:"all" fallback path, when qpdf isn't available for the
-    // proper per-sheet-paginated conversion).
-    PdfViewerWidget(QPdfDocument* pdfDoc, QTemporaryFile* sourceFile, QTemporaryFile* tempPdf,
-                    const QStringList& sheetNames = {}, const QVector<int>& sheetStartPages = {}, QWidget* parent = nullptr)
-      : QWidget(parent), m_sourceFile(sourceFile), m_tempPdf(tempPdf) {
-        QVBoxLayout* layout = new QVBoxLayout(this);
-        layout->setContentsMargins(0, 0, 0, 0);
-        layout->setSpacing(0);
-
-        bool useExplicitStarts = !sheetStartPages.isEmpty() && sheetStartPages.size() == sheetNames.size();
-        bool useLegacyOneToOne = sheetStartPages.isEmpty() && sheetNames.size() == pdfDoc->pageCount();
-
-        if (sheetNames.size() > 1 && (useExplicitStarts || useLegacyOneToOne)) {
-            if (useExplicitStarts) m_sheetStartPages = sheetStartPages;
-            else { for (int i = 0; i < sheetNames.size(); ++i) m_sheetStartPages.push_back(i); }
-
-            m_tabBar = new QTabBar(this);
-            m_tabBar->setExpanding(false);
-            for (const QString& name : sheetNames)
-                m_tabBar->addTab(name);
-            layout->addWidget(m_tabBar);
-            connect(m_tabBar, &QTabBar::currentChanged, this, [this](int index) {
-                if (index >= 0 && index < m_sheetStartPages.size() && m_pdfView->pageNavigator())
-                    m_pdfView->pageNavigator()->jump(m_sheetStartPages[index], QPointF());
-            });
-        }
-
-        pdfDoc->setParent(this);
-        m_pdfView = new QPdfView(this);
-        m_pdfView->setDocument(pdfDoc);
-        // Always MultiPage (continuous scroll), even with a tab bar. A sheet
-        // can legitimately span more than one page now (see
-        // X2TWrapper::convertXlsxAllSheetsPaginated); SinglePage mode shows
-        // exactly one page and needs an explicit page-forward action to
-        // advance, so a multi-page sheet's later pages were effectively
-        // hidden behind the tab bar with no obvious way to reach them.
-        // MultiPage's normal scrolling reveals them the same way it reveals
-        // the next sheet when you keep scrolling past the current one.
-        m_pdfView->setPageMode(QPdfView::PageMode::MultiPage);
-        m_pdfView->setZoomMode(QPdfView::ZoomMode::FitToWidth);
-        layout->addWidget(m_pdfView);
-
-        if (m_tabBar) {
-            connect(m_pdfView->pageNavigator(), &QPdfPageNavigator::currentPageChanged, this, [this](int page) {
-                // Largest sheet index whose start page is <= the current page.
-                int active = 0;
-                for (int i = 0; i < m_sheetStartPages.size(); ++i) {
-                    if (page >= m_sheetStartPages[i]) active = i;
-                    else break;
-                }
-                if (active != m_tabBar->currentIndex())
-                    m_tabBar->setCurrentIndex(active);
-            });
-        }
-
-        m_focusManager = new QtWlPlugin::FocusManager(this, m_pdfView, this);
-        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Plus), QtWlPlugin::FocusManager::Always,
-            [this]() { zoomIn(); return true; });
-        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), QtWlPlugin::FocusManager::Always,
-            [this]() { zoomIn(); return true; });
-        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Minus), QtWlPlugin::FocusManager::Always,
-            [this]() { zoomOut(); return true; });
-        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), QtWlPlugin::FocusManager::Always,
-            [this]() { zoomReset(); return true; });
-        m_focusManager->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_C), QtWlPlugin::FocusManager::Always,
-            [this]() { copyCurrentPageText(); return true; });
-
-        // QPdfView is a QAbstractScrollArea with no wheelEvent override of its
-        // own; its base implementation consumes Ctrl+wheel for scrolling
-        // whenever there's room left to scroll in that direction, so a
-        // wheelEvent() override on this outer widget only fires once the
-        // scroll area is already at its limit -- which on a freshly-opened,
-        // top-scrolled document is only true for the "scroll up"/zoom-in
-        // direction (confirmed: this exact asymmetry was the reported bug --
-        // zoom in via Ctrl+wheel worked, zoom out did not). Installing the
-        // filter directly on the viewport intercepts before the scroll area
-        // gets a chance to consume it, for both directions consistently.
-        m_pdfView->viewport()->installEventFilter(this);
-    }
-
-    ~PdfViewerWidget() {
-        if (m_sourceFile) delete m_sourceFile;
-        if (m_tempPdf) delete m_tempPdf;
-    }
-
-    void zoomIn() {
-        m_pdfView->setZoomMode(QPdfView::ZoomMode::Custom);
-        m_pdfView->setZoomFactor(qMin(m_pdfView->zoomFactor() * 1.2, 8.0));
-    }
-    void zoomOut() {
-        m_pdfView->setZoomMode(QPdfView::ZoomMode::Custom);
-        m_pdfView->setZoomFactor(qMax(m_pdfView->zoomFactor() / 1.2, 0.1));
-    }
-    void zoomReset() {
-        m_pdfView->setZoomMode(QPdfView::ZoomMode::FitToWidth);
-    }
-
-    // Copies the currently-visible page's full text to the clipboard.
-    //
-    // NOTE on scope: QPdfView's page-layout/coordinate-mapping internals are
-    // private (Q_DECLARE_PRIVATE, no public API to map a viewport click to a
-    // page + point-within-page), so true click-and-drag partial-text
-    // selection with visual highlighting isn't buildable on top of it without
-    // either fragile reverse-engineering of its private layout math, or
-    // replacing QPdfView with a custom-built page renderer for full control
-    // over that math. This whole-page-copy is the reliable subset achievable
-    // with the public API.
-    void copyCurrentPageText() {
-        QPdfDocument* doc = m_pdfView->document();
-        if (!doc) return;
-        int page = m_pdfView->pageNavigator() ? m_pdfView->pageNavigator()->currentPage() : 0;
-        if (page < 0) page = 0;
-        QPdfSelection sel = doc->getAllText(page);
-        QString text = sel.text();
-        if (!text.isEmpty())
-            QApplication::clipboard()->setText(text);
-    }
-
-    QtWlPlugin::FocusManager* focusManager() const { return m_focusManager; }
-
-protected:
-    void contextMenuEvent(QContextMenuEvent* event) override {
-        QMenu menu(this);
-        QAction* copyAction = menu.addAction("Copy page text");
-        connect(copyAction, &QAction::triggered, this, &PdfViewerWidget::copyCurrentPageText);
-        menu.exec(event->globalPos());
-    }
-
-    bool eventFilter(QObject* obj, QEvent* event) override {
-        if (obj == m_pdfView->viewport() && event->type() == QEvent::Wheel) {
-            QWheelEvent* wheelEv = static_cast<QWheelEvent*>(event);
-            if (wheelEv->modifiers() & Qt::ControlModifier) {
-                if (wheelEv->angleDelta().y() > 0) zoomIn();
-                else if (wheelEv->angleDelta().y() < 0) zoomOut();
-                return true; // consumed -- don't let the scroll area also scroll
-            }
-        }
-        return QWidget::eventFilter(obj, event);
-    }
-
-private:
-    QPdfView* m_pdfView = nullptr;
-    QTabBar* m_tabBar = nullptr;
-    QVector<int> m_sheetStartPages;
-    QtWlPlugin::FocusManager* m_focusManager = nullptr;
-    QTemporaryFile* m_sourceFile;
-    QTemporaryFile* m_tempPdf;
-};
 
 // --- Plugin Entry Points ---
 
@@ -1164,21 +1020,27 @@ extern "C" {
                     if (!converted)
                         converted = wrapper.convertToPdf(tempSource->fileName(), outPath, !sheetNames.isEmpty());
                     if (converted) {
-                        QPdfDocument* pdfDoc = new QPdfDocument();
-                        if (pdfDoc->load(outPath) == QPdfDocument::Error::None) {
+                        // pageCount() mismatch on the legacy fallback path
+                        // (e.g. a sheet spanning multiple pages under
+                        // printPages:"all") means the 1-sheet-per-page
+                        // assumption doesn't hold; MuPdfContainerWidget
+                        // silently skips the tab bar in that case rather
+                        // than showing a wrong mapping.
+                        MuPdfContainerWidget* pdfWidget = new MuPdfContainerWidget(
+                            outPath, sheetNames, sheetStartPages, tempSource, tempPdf, (QWidget*)ParentWin);
+                        if (pdfWidget->isValid()) {
                             printf("[OfficeView] Successfully rendered %s with %s (x2t)\n", filePath.toUtf8().constData(), wrapper.loadedEngine.toUtf8().constData());
                             fflush(stdout);
-                            // pageCount() mismatch on the legacy fallback path
-                            // (e.g. a sheet spanning multiple pages under
-                            // printPages:"all") means the 1-sheet-per-page
-                            // assumption doesn't hold; PdfViewerWidget
-                            // silently skips the tab bar in that case rather
-                            // than showing a wrong mapping.
-                            PdfViewerWidget* pdfWidget = new PdfViewerWidget(pdfDoc, tempSource, tempPdf, sheetNames, sheetStartPages, (QWidget*)ParentWin);
                             pdfWidget->show();
                             return (HWND)pdfWidget;
                         }
-                        delete pdfDoc;
+                        // tempSource is reused below for the LibreOfficeKit
+                        // fallback if this whole x2t attempt fails; tempPdf
+                        // (the x2t output specific to this failed attempt)
+                        // is fine to let the widget's destructor clean up.
+                        pdfWidget->releaseSourceFile();
+                        delete pdfWidget;
+                        tempPdf = nullptr;
                     }
                 }
                 delete tempPdf;
@@ -1248,8 +1110,8 @@ extern "C" {
         switch (Command) {
             case lc_focus:
                 // DC uses lc_focus to hand focus to/reclaim focus from the plugin.
-                // Parameter: 1 = focus gained, 0 = focus lost. Both rendering
-                // paths (x2t/PdfViewerWidget and LibreOfficeKit/LOKContainerWidget)
+                // Parameter: 1 = focus gained, 0 = focus lost. All rendering
+                // paths (x2t/MuPdfContainerWidget and LibreOfficeKit/LOKContainerWidget)
                 // use QtWlPlugin::FocusManager, which also self-manages focus
                 // via a QApplication-level event filter -- confirmed via live
                 // logging that DC sends an explicit lc_focus(0) immediately
@@ -1258,15 +1120,15 @@ extern "C" {
                 // arrived (the actual cause of a "must click twice" symptom).
                 // setActiveFromHost() ignores deactivation requests that
                 // arrive within a short grace period of such an activation.
-                if (PdfViewerWidget* pdfWidget = qobject_cast<PdfViewerWidget*>(widget)) {
+                if (MuPdfContainerWidget* pdfWidget = qobject_cast<MuPdfContainerWidget*>(widget)) {
                     pdfWidget->focusManager()->setActiveFromHost(Parameter != 0);
                 } else if (LOKContainerWidget* lokContainer = qobject_cast<LOKContainerWidget*>(widget)) {
                     lokContainer->focusManager()->setActiveFromHost(Parameter != 0);
                 }
                 return LISTPLUGIN_OK;
             case lc_copy:
-                if (PdfViewerWidget* pdfWidget = qobject_cast<PdfViewerWidget*>(widget)) {
-                    pdfWidget->copyCurrentPageText();
+                if (MuPdfContainerWidget* pdfWidget = qobject_cast<MuPdfContainerWidget*>(widget)) {
+                    pdfWidget->copySelectionOrCurrentPage();
                     return LISTPLUGIN_OK;
                 } else if (LOKContainerWidget* lokContainer = qobject_cast<LOKContainerWidget*>(widget)) {
                     lokContainer->copyAllText();

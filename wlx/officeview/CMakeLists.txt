@@ -11,7 +11,9 @@ if(UNIX)
     set(CMAKE_SHARED_LIBRARY_SUFFIX ".wlx")
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Pdf PdfWidgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(MUPDF REQUIRED IMPORTED_TARGET mupdf)
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/../../sdk
@@ -21,6 +23,7 @@ include_directories(
 add_library(officeview SHARED
     src/officeview.cpp
     src/focus/FocusManager.cpp
+    src/mupdfwidget.cpp
 )
 
 target_link_libraries(officeview
@@ -28,6 +31,5 @@ target_link_libraries(officeview
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
-    Qt6::Pdf
-    Qt6::PdfWidgets
+    PkgConfig::MUPDF
 )
