@@ -53,6 +53,7 @@ if(ENABLE_ROCKSDB_LEVELDB)
     set(WITH_GFLAGS OFF CACHE BOOL "" FORCE)
     set(ROCKSDB_BUILD_SHARED OFF CACHE BOOL "" FORCE)
     set(FAIL_ON_WARNINGS OFF CACHE BOOL "" FORCE)
+    set(USE_RTTI 1 CACHE STRING "" FORCE)
     FetchContent_Declare(rocksdb
         GIT_REPOSITORY https://github.com/facebook/rocksdb.git
         GIT_TAG        v9.11.2
