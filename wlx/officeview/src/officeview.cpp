@@ -806,8 +806,31 @@ public:
         env.insert("LD_LIBRARY_PATH", libPath);
         proc.setProcessEnvironment(env);
         
-        proc.start(x2tBin, QStringList() << configXml.fileName());
+        QString bwrapBin = QStandardPaths::findExecutable("bwrap");
+        if (!bwrapBin.isEmpty() && !fontPath.isEmpty()) {
+            QString fontSelectionBin = QFileInfo(fontPath).absolutePath() + "/font_selection.bin";
+            QStringList bwrapArgs;
+            bwrapArgs << "--ro-bind" << "/usr" << "/usr"
+                      << "--symlink" << "usr/lib" << "lib"
+                      << "--symlink" << "usr/lib64" << "lib64"
+                      << "--symlink" << "usr/bin" << "bin"
+                      << "--ro-bind" << "/opt" << "/opt"
+                      << "--ro-bind" << "/etc" << "/etc"
+                      << "--bind" << "/home" << "/home"
+                      << "--bind" << "/tmp" << "/tmp"
+                      << "--dev" << "/dev" << "--proc" << "/proc"
+                      << "--ro-bind" << fontPath << (libPath + "/converter/AllFonts.js")
+                      << "--ro-bind" << fontSelectionBin << (libPath + "/converter/font_selection.bin")
+                      << "--chdir" << libPath
+                      << x2tBin << configXml.fileName();
+            proc.start(bwrapBin, bwrapArgs);
+        } else {
+            proc.start(x2tBin, QStringList() << configXml.fileName());
+        }
+
         if (proc.waitForFinished(10000)) {
+
+            
             if (QFileInfo::exists(outputPath) && QFileInfo(outputPath).size() > 0) {
                 if (proc.exitCode() != 0) {
                     printf("[OfficeView] x2t exited with %d but generated a valid PDF. Proceeding!\n", proc.exitCode());
