@@ -27,6 +27,7 @@ private:
     void returnFocusToDC();
     void restoreFocusToDC();
     void instantiatePart();
+    void restoreZoom();
     bool scrollView(int key);
 
     KParts::ReadOnlyPart *m_part;
@@ -37,6 +38,7 @@ private:
     QPointer<QWidget> m_savedFocusWidget;
     QPointer<QWidget> m_partFocusWidget;
     bool m_isActive = false;
+    bool m_needZoomRestore = false;
 };
 
 #endif // KPARTWIDGET_H

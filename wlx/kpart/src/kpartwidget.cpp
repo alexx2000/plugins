@@ -21,6 +21,7 @@
 #include <QDialog>
 #include <QAction>
 #include <QSettings>
+#include <QDir>
 #include <QDebug>
 #include <KActionCollection>
 #include <KXMLGUIFactory>
@@ -29,6 +30,7 @@ KPartWidget::KPartWidget(QWidget *parent)
     : QWidget(parent)
     , m_part(nullptr)
     , m_loadGeneration(0)
+    , m_needZoomRestore(false)
 {
     // NoFocus by default — activation is managed exclusively via
     // lc_focus from DC and geometry-based click detection.
@@ -175,6 +177,15 @@ void KPartWidget::installFocusGuard()
 
 bool KPartWidget::eventFilter(QObject *watched, QEvent *event)
 {
+    if (m_part && watched == m_part->widget() && m_needZoomRestore) {
+        if (event->type() == QEvent::Paint || event->type() == QEvent::Resize) {
+            m_needZoomRestore = false;
+            QTimer::singleShot(0, this, [this]() {
+                restoreZoom();
+            });
+        }
+    }
+
     switch (event->type()) {
     case QEvent::MouseButtonPress: {
         // Geometry-based click detection, mirroring FocusManager pattern.
@@ -458,7 +469,43 @@ bool KPartWidget::loadFile(const QString &fileName)
 
 void KPartWidget::instantiatePart()
 {
+    // If the selected part is Gwenview, temporarily redirect XDG_CONFIG_HOME
+    // to a custom isolated folder so we can supply our own gwenviewrc (with EnlargeSmallerImages=true)
+    // without ever touching or risking corruption of the user's main ~/.config/gwenviewrc.
+    QByteArray originalXdgConfig;
+    bool redirectedXdg = false;
+    
+    if (m_selectedPart.pluginId() == QLatin1String("gvpart")) {
+        originalXdgConfig = qgetenv("XDG_CONFIG_HOME");
+        
+        QString customXdgPath = QDir::homePath() + QStringLiteral("/.config/doublecmd/kpart_gwenview_config");
+        QDir().mkpath(customXdgPath);
+        
+        // Write the custom gwenviewrc configuration
+        QString customRcPath = customXdgPath + QStringLiteral("/gwenviewrc");
+        QSettings gwenviewSettings(customRcPath, QSettings::IniFormat);
+        gwenviewSettings.beginGroup(QStringLiteral("ImageView"));
+        gwenviewSettings.setValue(QStringLiteral("EnlargeSmallerImages"), true);
+        gwenviewSettings.sync();
+        
+        qputenv("XDG_CONFIG_HOME", customXdgPath.toLocal8Bit());
+        redirectedXdg = true;
+        qDebug() << "[KPartWidget] Redirected XDG_CONFIG_HOME to" << customXdgPath;
+    }
+
     auto result = KParts::PartLoader::instantiatePart<KParts::ReadOnlyPart>(m_selectedPart, this, this);
+    
+    // Restore the environment variable immediately after instantiation so it does
+    // not affect the rest of Double Commander or other plugins.
+    if (redirectedXdg) {
+        if (originalXdgConfig.isEmpty()) {
+            qunsetenv("XDG_CONFIG_HOME");
+        } else {
+            qputenv("XDG_CONFIG_HOME", originalXdgConfig);
+        }
+        qDebug() << "[KPartWidget] Restored original XDG_CONFIG_HOME";
+    }
+
     if (result) {
         m_part = result.plugin;
 
@@ -470,6 +517,9 @@ void KPartWidget::instantiatePart()
         // Must be called AFTER the part is fully loaded (from completed signal).
         auto configureAndRestore = [this]() {
             if (!m_part || !m_part->widget()) return;
+            
+            qDebug() << "[KPartWidget] configureAndRestore: KPartWidget size=" << this->size()
+                     << "m_part->widget() size=" << m_part->widget()->size();
             
             // Collect actions from both sources, deduplicating
             QSet<QAction*> seen;
@@ -525,14 +575,27 @@ void KPartWidget::instantiatePart()
                     
                     connect(act, &QAction::toggled, this, [this, actionName](bool checked) {
                         qDebug() << "[KPartWidget] Action toggled:" << actionName << "checked:" << checked;
-                        QSettings s(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("doublecmd"), QStringLiteral("wlx_kpart"));
-                        s.setValue(actionName, checked);
-                        s.sync();
-                        qDebug() << "[KPartWidget] Saved" << actionName << "=" << checked << "to" << s.fileName();
+                        
+                        bool isZoomAction = (actionName == QLatin1String("view_zoom_to_fit") ||
+                                             actionName == QLatin1String("view_actual_size"));
+                        
+                        if (!isZoomAction || checked) {
+                            QSettings s(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("doublecmd"), QStringLiteral("wlx_kpart"));
+                            s.setValue(actionName, checked);
+                            
+                            if (isZoomAction && checked) {
+                                QString otherName = (actionName == QLatin1String("view_zoom_to_fit"))
+                                    ? QStringLiteral("view_actual_size")
+                                    : QStringLiteral("view_zoom_to_fit");
+                                s.setValue(otherName, false);
+                            }
+                            s.sync();
+                            qDebug() << "[KPartWidget] Saved" << actionName << "=" << checked << "to" << s.fileName();
+                        }
                         
                         if (m_part) {
                             // Radio-button behavior for zoom modes:
-                            // checking one unchecks the other; unchecking one checks the other.
+                            // checking one unchecks the other.
                             QString otherName;
                             if (actionName == QLatin1String("view_zoom_to_fit")) {
                                 otherName = QStringLiteral("view_actual_size");
@@ -547,8 +610,10 @@ void KPartWidget::instantiatePart()
                                     other = m_part->findChild<QAction*>(otherName, Qt::FindChildrenRecursively);
                                 }
                                 if (checked && other && other->isChecked()) {
-                                    qDebug() << "[KPartWidget] Radio: toggling off" << otherName;
-                                    other->trigger(); // let Gwenview handle its internal state
+                                    qDebug() << "[KPartWidget] Radio: visually unchecking" << otherName;
+                                    other->blockSignals(true);
+                                    other->setChecked(false);
+                                    other->blockSignals(false);
                                 }
                             }
                         }
@@ -565,43 +630,14 @@ void KPartWidget::instantiatePart()
             // Now restore saved settings (connections are already established above).
             // We must use trigger() instead of setChecked() so the KPart's internal
             // handler fires (e.g. Gwenview actually changes zoom mode, not just checkbox).
-            //
-            // For the zoom radio pair: Gwenview fights back when we setChecked(false)
-            // on zoom_to_fit — it re-checks it internally, cascading through our radio
-            // handler and undoing the restore. Fix: block signals on BOTH zoom actions,
-            // uncheck both, unblock, then trigger() only the desired one.
             QSettings settings(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("doublecmd"), QStringLiteral("wlx_kpart"));
             qDebug() << "[KPartWidget] Restoring settings from" << settings.fileName() << "keys:" << settings.allKeys();
             
-            // Identify zoom actions and which should be active
-            static const QString zoomFit = QStringLiteral("view_zoom_to_fit");
-            static const QString zoomActual = QStringLiteral("view_actual_size");
-            QAction *zoomFitAct = nullptr, *zoomActualAct = nullptr;
-            for (QAction *act : allActions) {
-                if (act->objectName() == zoomFit) zoomFitAct = act;
-                else if (act->objectName() == zoomActual) zoomActualAct = act;
-            }
-            
-            QString activeZoom;
-            if (settings.contains(zoomActual) && settings.value(zoomActual).toBool()) {
-                activeZoom = zoomActual;
-            } else if (settings.contains(zoomFit) && settings.value(zoomFit).toBool()) {
-                activeZoom = zoomFit;
-            }
-            
-            // Restore zoom radio pair: just trigger() the desired action.
-            // trigger() properly changes Gwenview's internal state (same as a menu click).
-            // If the action is already checked (Gwenview's default), skip — it's already active.
-            if (!activeZoom.isEmpty() && (zoomFitAct || zoomActualAct)) {
-                QAction *activeAct = (activeZoom == zoomFit) ? zoomFitAct : zoomActualAct;
-                qDebug() << "[KPartWidget] Restoring zoom:" << activeZoom
-                         << "currently checked:" << (activeAct ? activeAct->isChecked() : false);
-                if (activeAct && !activeAct->isChecked()) {
-                    activeAct->trigger();
-                }
-            }
+            restoreZoom();
             
             // Restore non-zoom checkable actions normally
+            static const QString zoomFit = QStringLiteral("view_zoom_to_fit");
+            static const QString zoomActual = QStringLiteral("view_actual_size");
             for (QAction *act : allActions) {
                 if (!act->isCheckable()) continue;
                 QString actionName = act->objectName();
@@ -623,6 +659,7 @@ void KPartWidget::instantiatePart()
         connect(m_part, &KParts::ReadOnlyPart::completed, this, [this, configureAndRestore]() {
             installFocusGuard();
             restoreFocusToDC();
+            m_needZoomRestore = true;
             
             // Configure action connections now that the part is fully loaded.
             // The restore portion inside configureAndRestore uses trigger() which
@@ -671,6 +708,7 @@ void KPartWidget::instantiatePart()
         connect(m_part, &KParts::ReadOnlyPart::completedWithPendingAction, this, [this, configureAndRestore]() {
             installFocusGuard();
             restoreFocusToDC();
+            m_needZoomRestore = true;
             QTimer::singleShot(0, this, [this, configureAndRestore]() {
                 configureAndRestore();
             });
@@ -767,4 +805,51 @@ bool KPartWidget::scrollView(int key)
         return true;
     }
     return false;
+}
+
+void KPartWidget::restoreZoom()
+{
+    if (!m_part) return;
+    
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope, QStringLiteral("doublecmd"), QStringLiteral("wlx_kpart"));
+    
+    static const QString zoomFit = QStringLiteral("view_zoom_to_fit");
+    static const QString zoomActual = QStringLiteral("view_actual_size");
+    
+    QString activeZoom;
+    if (settings.contains(zoomActual) && settings.value(zoomActual).toBool()) {
+        activeZoom = zoomActual;
+    } else if (settings.contains(zoomFit) && settings.value(zoomFit).toBool()) {
+        activeZoom = zoomFit;
+    } else {
+        activeZoom = zoomFit; // Default fallback if both are false or unconfigured
+    }
+    
+    QAction *zoomFitAct = nullptr, *zoomActualAct = nullptr;
+    QList<QAction*> actions;
+    if (m_part->actionCollection()) {
+        actions = m_part->actionCollection()->actions();
+    }
+    const auto childActions = m_part->findChildren<QAction*>(Qt::FindChildrenRecursively);
+    for (QAction *a : childActions) {
+        if (!actions.contains(a)) actions.append(a);
+    }
+    for (QAction *act : actions) {
+        if (act->objectName() == zoomFit) zoomFitAct = act;
+        else if (act->objectName() == zoomActual) zoomActualAct = act;
+    }
+    
+    if (!activeZoom.isEmpty() && (zoomFitAct || zoomActualAct)) {
+        QAction *activeAct = (activeZoom == zoomFit) ? zoomFitAct : zoomActualAct;
+        qDebug() << "[KPartWidget] restoreZoom: activeZoom=" << activeZoom
+                 << "currently checked=" << (activeAct ? activeAct->isChecked() : false);
+        if (activeAct) {
+            if (activeAct->isChecked()) {
+                activeAct->blockSignals(true);
+                activeAct->setChecked(false);
+                activeAct->blockSignals(false);
+            }
+            activeAct->trigger();
+        }
+    }
 }
