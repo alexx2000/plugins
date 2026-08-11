@@ -51,11 +51,12 @@ KPartWidget::KPartWidget(QWidget *parent)
         if (!m_part || !m_part->widget()) return;
 
         bool nowInside = now && (now == this || this->isAncestorOf(now));
+        bool isPopup = now && ((now->windowFlags() & Qt::Popup) || (now->windowFlags() & Qt::ToolTip) || now->inherits("QMenu"));
 
         if (m_isActive) {
             // If focus left the plugin while active, deactivate.
             bool oldInside = old && (old == this || this->isAncestorOf(old));
-            if (oldInside && !nowInside) {
+            if (oldInside && !nowInside && !isPopup) {
                 setActive(false);
             }
         } else {
@@ -664,6 +665,15 @@ void KPartWidget::instantiatePart()
                         if (vbar) {
                             vbar->setValue(0);
                         }
+                    } else if (m_selectedPart.pluginId() == QLatin1String("okularpart")) {
+                        // Enable text selection tool by default in Okular so users can copy text.
+                        QAction *textSelect = m_part->actionCollection() ? m_part->actionCollection()->action(QStringLiteral("mouse_textselect")) : nullptr;
+                        if (!textSelect) {
+                            textSelect = m_part->findChild<QAction*>(QStringLiteral("mouse_textselect"), Qt::FindChildrenRecursively);
+                        }
+                        if (textSelect) {
+                            textSelect->trigger();
+                        }
                     }
                 });
             }
@@ -704,6 +714,15 @@ void KPartWidget::instantiatePart()
                         }
                         if (vbar) {
                             vbar->setValue(0);
+                        }
+                    } else if (m_selectedPart.pluginId() == QLatin1String("okularpart")) {
+                        // Enable text selection tool by default in Okular so users can copy text.
+                        QAction *textSelect = m_part->actionCollection() ? m_part->actionCollection()->action(QStringLiteral("mouse_textselect")) : nullptr;
+                        if (!textSelect) {
+                            textSelect = m_part->findChild<QAction*>(QStringLiteral("mouse_textselect"), Qt::FindChildrenRecursively);
+                        }
+                        if (textSelect) {
+                            textSelect->trigger();
                         }
                     }
                 });
