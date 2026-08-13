@@ -1,5 +1,7 @@
 #include "StructViewWidget.h"
 
+#include <QKeyEvent>
+#include <QCoreApplication>
 #include <wlxbase_wlqt/FocusManager.h>
 #include <wlxbase_wlqt/PluginToolBar.h>
 #include <wlxbase_wlqt/EditableGridWidget.h>
@@ -185,6 +187,14 @@ void StructViewWidget::setupUi()
     });
 
     m_fm = new FocusManager(this, m_gridView, this);
+    m_fm->registerShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q), FocusManager::Always, [this]() {
+        m_fm->setActive(false);
+        if (QWidget *top = m_fm->pluginRoot()->window()) {
+            QKeyEvent *ke = new QKeyEvent(QEvent::KeyPress, Qt::Key_Q, Qt::ControlModifier);
+            QCoreApplication::postEvent(top, ke);
+        }
+        return true;
+    });
     m_grid = new EditableGridWidget(m_gridView, GridMode::MemoryDocument, m_fm, this);
 
     // --- Toolbar ---
