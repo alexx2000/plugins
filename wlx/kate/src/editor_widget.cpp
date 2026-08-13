@@ -361,6 +361,7 @@ bool EditorWidget::eventFilter(QObject *obj, QEvent *event) {
                 (key == Qt::Key_Z && (mods & Qt::ControlModifier)) ||
                 (key == Qt::Key_Y && (mods & Qt::ControlModifier)) ||
                 (key == Qt::Key_W && (mods & Qt::ControlModifier)) ||
+                (key == Qt::Key_Q && (mods & Qt::ControlModifier)) ||
                 (key == Qt::Key_R && (mods & Qt::AltModifier) && (mods & Qt::ShiftModifier)) ||
                 (key == Qt::Key_P && (mods & Qt::ControlModifier)) ||
                 ((key == Qt::Key_Plus || key == Qt::Key_Equal) && (mods & Qt::ControlModifier)) ||
@@ -485,6 +486,12 @@ bool EditorWidget::eventFilter(QObject *obj, QEvent *event) {
                     triggered = true;
                 } else if (key == Qt::Key_W && (mods & Qt::ControlModifier)) {
                     toggleReadOnly();
+                    triggered = true;
+                } else if (key == Qt::Key_Q && (mods & Qt::ControlModifier)) {
+                    if (QWidget *w = window()) {
+                        w->setFocus(Qt::OtherFocusReason);
+                        QCoreApplication::postEvent(w, new QKeyEvent(QEvent::KeyPress, Qt::Key_Q, Qt::ControlModifier));
+                    }
                     triggered = true;
                 } else if (key == Qt::Key_R && (mods & Qt::AltModifier) && (mods & Qt::ShiftModifier)) {
                     toggleReadOnly();

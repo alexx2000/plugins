@@ -1,4 +1,4 @@
-# rich_editor_qt
+# kate_qt6
 
 A premium, high-performance Double Commander WLX plugin based on Native Qt6 and KDE's `KTextEditor` framework.
 
@@ -25,4 +25,4 @@ make
 ```
 
 ## Installation
-Copy `rich_editor_qt.wlx` to `~/.config/doublecmd/plugins/wlx/` and add it via Double Commander's Options -> Plugins -> WLX.
+Copy `kate_qt6.wlx` to `~/.config/doublecmd/plugins/wlx/` and add it via Double Commander's Options -> Plugins -> WLX.
