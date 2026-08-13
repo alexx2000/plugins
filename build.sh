@@ -79,6 +79,16 @@ install -m 644 wlx/jsonview/jsonview_qt6.wlx release/wlx/jsonview/
 cp -r wlx/jsonview/langs release/wlx/jsonview/
 install -m 644 wlx/jsonview/*.md release/wlx/jsonview/
 install -m 644 wlx/jsonview/*.png release/wlx/jsonview/
+
+# csvview
+mkdir -p release/wlx/csvview
+mkdir -p wlx/csvview/build
+(cd wlx/csvview/build && cmake .. && make)
+install -m 644 wlx/csvview/build/csvview_qt6.wlx release/wlx/csvview/
+cp -r wlx/csvview/langs release/wlx/csvview/
+install -m 644 wlx/csvview/*.md release/wlx/csvview/
+install -m 644 wlx/csvview/*.png release/wlx/csvview/
+
 # logview
 mkdir -p release/wlx/logview
 mkdir -p wlx/logview/build
