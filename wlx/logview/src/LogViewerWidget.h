@@ -2,6 +2,7 @@
 
 #include <QWidget>
 #include <QListView>
+#include <QComboBox>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QDateTimeEdit>
@@ -13,6 +14,8 @@
 #include <QMenu>
 #include <QAction>
 #include <QPointer>
+#include <QFileDialog>
+#include <QFileInfo>
 
 #include "LogModel.h"
 
@@ -50,7 +53,7 @@ protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
 
 private slots:
-    void onSearchStartClicked();
+    void executeSearch(bool jumpToNext);
     void onSearchStopClicked();
     void onFollowToggled(bool checked);
     void onFilterModeToggled(bool checked);
@@ -59,22 +62,28 @@ private slots:
     void onTailUpdated();
     void onTimeRangeChanged();
     void copySelectedLines();
+    void deleteSelectedLines();
+    void clearLogFile();
+    void extractSelectedLines();
     void onSettingsClicked();
     std::vector<HighlightRule> loadHighlightRules();
     void saveHighlightRules(const std::vector<HighlightRule>& rules);
 
 private:
     void scrollToSourceRow(int sourceRow);
-    void installFocusGuard();       // NoFocus + focusProxy on all children
     void restoreFocusToDC();        // Give focus back to the saved DC widget
-    bool isInputWidget(QWidget *w) const; // Check if w is an input widget
+    bool isTextInputWidget(QWidget *w) const; // Check if w is a text input (searchEdit, timeStart, timeEnd)
 
     // UI Elements
     QListView *listView;
-    QLineEdit *searchEdit;
-    QPushButton *btnSearchStart;
+    QComboBox *searchComboBox;
+    QPushButton *btnFilter;
+    QPushButton *btnSearchNext;
     QPushButton *btnSearchStop;
+    QPushButton *btnClearLog;
+    QPushButton *btnExtract;
     QPushButton *btnSettings;
+    QPushButton *btnResetFilter;
     QDateTimeEdit *timeStart;
     QDateTimeEdit *timeEnd;
     QCheckBox *chkFollow;
@@ -90,7 +99,8 @@ private:
     int m_lastMatchRow = -1;
     bool m_timestampsLoading = false;
 
-    // Focus management: save/restore DC's focused widget across file loads
+    // Focus management
+    bool m_isActive = false;
     QPointer<QWidget> m_savedFocusWidget;
-    QPointer<QWidget> m_activeInput; // currently active input widget (search/time edits)
+    QPointer<QWidget> m_activeInput; // currently active text input widget (search/time edits)
 };

@@ -72,6 +72,7 @@ install -m 644 wdx/mediainfo/luajit/*.lua      release/wdx/mediainfo/
 install -m 644 wdx/translitwdx/translitwdx.lua release/wdx/translitwdx/
 install -m 644 wdx/translitwdx/readme.txt      release/wdx/translitwdx/
 
+<<<<<<< HEAD
 # jsonview
 mkdir -p release/wlx/jsonview
 make -C wlx/jsonview/src clean all
@@ -103,7 +104,6 @@ mkdir -p wlx/officeview/build
 (cd wlx/officeview/build && cmake .. && make)
 install -m 644 wlx/officeview/build/officeview.wlx release/wlx/officeview/
 install -m 644 wlx/officeview/*.md release/wlx/officeview/
-
 
 # logview
 mkdir -p release/wlx/logview
