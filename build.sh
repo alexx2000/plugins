@@ -89,6 +89,22 @@ cp -r wlx/csvview/langs release/wlx/csvview/
 install -m 644 wlx/csvview/*.md release/wlx/csvview/
 install -m 644 wlx/csvview/*.png release/wlx/csvview/
 
+# kpart
+mkdir -p release/wlx/kpart
+mkdir -p wlx/kpart/build
+(cd wlx/kpart/build && cmake .. && make)
+install -m 644 wlx/kpart/build/kpart_host_qt6.wlx release/wlx/kpart/
+install -m 644 wlx/kpart/*.md release/wlx/kpart/
+install -m 644 wlx/kpart/*.png release/wlx/kpart/
+
+# officeview
+mkdir -p release/wlx/officeview
+mkdir -p wlx/officeview/build
+(cd wlx/officeview/build && cmake .. && make)
+install -m 644 wlx/officeview/build/officeview.wlx release/wlx/officeview/
+install -m 644 wlx/officeview/*.md release/wlx/officeview/
+
+
 # logview
 mkdir -p release/wlx/logview
 mkdir -p wlx/logview/build
