@@ -129,6 +129,14 @@ install -m 644 wlx/kate/build/rich_editor_qt.wlx release/wlx/kate/
 install -m 644 wlx/kate/*.md release/wlx/kate/
 install -m 644 wlx/kate/*.png release/wlx/kate/
 
+# diagramview
+mkdir -p release/wlx/diagramview
+make -C wlx/diagramview/src clean all
+install -m 644 wlx/diagramview/diagramview_qt6.wlx release/wlx/diagramview/
+install -m 644 wlx/diagramview/config.json release/wlx/diagramview/
+install -m 644 wlx/diagramview/*.md release/wlx/diagramview/
+install -m 644 wlx/diagramview/*.png release/wlx/diagramview/
+
 pushd release
 tar -czpf ../plugins-$(date +%y.%m.%d)-$ARCH.tar.gz *
 popd
